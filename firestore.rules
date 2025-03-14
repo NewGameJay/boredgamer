@@ -1,0 +1,35 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user is accessing their own data
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Studio collection rules
+    match /studios/{studioId} {
+      // Allow read if user is authenticated and owns the document
+      allow read: if isOwner(studioId);
+      
+      // Allow create if user is authenticated and creating their own document
+      allow create: if isOwner(studioId)
+        && request.resource.data.keys().hasAll(['name', 'email', 'tier', 'features', 'createdAt', 'updatedAt'])
+        && request.resource.data.tier == 'independent'
+        && request.resource.data.email == request.auth.token.email;
+      
+      // Allow update if user is authenticated and updating their own document
+      allow update: if isOwner(studioId)
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['name', 'tier', 'features', 'updatedAt']);
+      
+      // Never allow delete
+      allow delete: if false;
+    }
+  }
+}
