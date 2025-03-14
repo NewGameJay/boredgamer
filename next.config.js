@@ -17,8 +17,25 @@ const nextConfig = {
   experimental: {
     serverActions: true
   },
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
+    // Fixes npm packages that depend on `undici` module
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        undici: false,
+      };
+    }
+
     config.externals = [...(config.externals || []), { canvas: 'canvas' }];
+    
+    // Add transpilePackages to handle private class fields
+    config.transpilePackages = [
+      'undici',
+      '@firebase/auth',
+      'firebase',
+      'firebase/auth'
+    ];
+
     return config;
   },
 };
