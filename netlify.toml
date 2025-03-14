@@ -1,0 +1,27 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "18.17.0"
+  NPM_FLAGS = "--no-audit --no-fund"
+  NEXT_TELEMETRY_DISABLED = "1"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Cache Next.js build artifacts
+[[plugins]]
+  package = "netlify-plugin-cache-nextjs"
+
+# Production context
+[context.production]
+  environment = { NODE_ENV = "production" }
+
+# Development context
+[context.development]
+  environment = { NODE_ENV = "development" }
+
+# Deploy Preview context
+[context.deploy-preview]
+  environment = { NODE_ENV = "production" }
