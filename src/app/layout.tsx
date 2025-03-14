@@ -1,20 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/lib/auth/auth-context';
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+const inter = Inter({ 
+  subsets: ['latin'],
+  display: 'swap',
 });
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: "BoredGamer SDK - Game Developer Dashboard",
@@ -29,7 +21,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full bg-black">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${inter.className} antialiased bg-black text-gray-100 h-full`}
+        className={`${inter.className} antialiased bg-black text-gray-100 h-full`}
       >
         <AuthProvider>
           <div className="min-h-screen flex flex-col">

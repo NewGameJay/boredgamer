@@ -15,10 +15,7 @@ const nextConfig = {
     ignoreDuringBuilds: false,
   },
   experimental: {
-    serverActions: {
-      bodySizeLimit: '2mb',
-      allowedOrigins: ['localhost:3000']
-    }
+    serverActions: true
   },
   webpack: (config) => {
     config.externals = [...(config.externals || []), { canvas: 'canvas' }];
