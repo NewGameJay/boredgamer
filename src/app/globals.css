@@ -58,6 +58,10 @@ body {
   color: transparent;
 }
 
+.dashboard-sidebar{
+  padding: 1.5rem 1rem;
+}
+
 .header-nav {
   display: flex;
   gap: 1.5rem;

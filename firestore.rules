@@ -17,11 +17,11 @@ service cloud.firestore {
       // Allow read if user is authenticated and owns the document
       allow read: if isOwner(studioId);
       
-      // Allow create if user is authenticated and creating their own document
-      allow create: if isOwner(studioId)
+      // Allow create if user is authenticated and the document ID matches their UID
+      allow create: if isAuthenticated() 
+        && studioId == request.auth.uid
         && request.resource.data.keys().hasAll(['name', 'email', 'tier', 'features', 'createdAt', 'updatedAt'])
-        && request.resource.data.tier == 'independent'
-        && request.resource.data.email == request.auth.token.email;
+        && request.resource.data.tier == 'independent';
       
       // Allow update if user is authenticated and updating their own document
       allow update: if isOwner(studioId)

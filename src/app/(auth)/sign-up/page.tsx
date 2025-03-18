@@ -31,7 +31,7 @@ export default function SignUp() {
         password,
         studioName
       });
-      router.push('/dashboard');
+      router.push('/');
     } catch (err) {
       setError('Error creating account. Please try again.');
     } finally {
@@ -50,7 +50,7 @@ export default function SignUp() {
     
     try {
       await signInWithGoogle();
-      router.push('/dashboard');
+      router.push('/');
     } catch (err) {
       setError('Failed to sign in with Google');
     } finally {

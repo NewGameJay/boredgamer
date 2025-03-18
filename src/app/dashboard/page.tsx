@@ -1,12 +1,13 @@
 'use client';
 
 import { useAuth } from '@/lib/auth/auth-context';
+import { SDKSetup } from '@/components/sdk/sdk-setup';
 
 export default function Dashboard() {
   const { user } = useAuth();
 
   return (
-    <div className="dashboard-content">
+    <div>
       <h1 style={{ 
         fontSize: '2rem', 
         fontWeight: 'bold',
@@ -81,6 +82,9 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* SDK Setup Section */}
+      <SDKSetup />
     </div>
   );
 }
