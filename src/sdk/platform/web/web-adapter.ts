@@ -38,6 +38,8 @@ export class WebNetworkAdapter implements NetworkAdapter {
   private errorHandler?: (error: any) => void;
 
   connect(url: string): void {
+    if (typeof window === 'undefined') return;
+    
     this.ws = new WebSocket(url);
     
     this.ws.onmessage = (event) => {
@@ -88,16 +90,21 @@ export class WebNetworkAdapter implements NetworkAdapter {
 }
 
 export class WebStorageAdapter implements StorageAdapter {
+  private isClient = typeof window !== 'undefined';
+
   async get(key: string): Promise<string | null> {
+    if (!this.isClient) return null;
     const value = localStorage.getItem(key);
     return value === null || value === undefined ? null : value;
   }
 
   async set(key: string, value: string): Promise<void> {
+    if (!this.isClient) return;
     localStorage.setItem(key, value);
   }
 
   async remove(key: string): Promise<void> {
+    if (!this.isClient) return;
     localStorage.removeItem(key);
   }
 }

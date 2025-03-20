@@ -194,6 +194,11 @@ export function SDKSetup() {
   };
 
   const copyToClipboard = async () => {
+    if (typeof window === 'undefined' || !navigator?.clipboard) {
+      console.warn('Clipboard API not available');
+      return;
+    }
+
     try {
       await navigator.clipboard.writeText(apiKey);
       setIsCopied(true);
