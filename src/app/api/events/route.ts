@@ -1,25 +1,21 @@
 import { NextResponse } from 'next/server';
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
-// Initialize Firebase Admin with a check for edge runtime
-const firebaseAdminConfig = {
-  projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
-  clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-  // Handle newlines in private key for edge runtime
-  privateKey: (process.env.FIREBASE_ADMIN_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+// Initialize Firebase
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize only if not already initialized
-if (!getApps().length) {
-  initializeApp({
-    credential: cert(firebaseAdminConfig)
-  });
-}
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-const db = getFirestore();
-
-export const runtime = 'edge'; // Specify edge runtime
+export const runtime = 'edge';
 
 export async function POST(request: Request) {
   try {
@@ -46,7 +42,7 @@ export async function POST(request: Request) {
       gameId,
       type,
       data,
-      timestamp: new Date(),
+      timestamp: serverTimestamp(),
       metadata: {
         sdkVersion: '1.0.0',
         apiVersion: 'v1'
@@ -55,8 +51,15 @@ export async function POST(request: Request) {
 
     try {
       // Save to Firestore
-      await db.collection('events').add(event);
-      return NextResponse.json({ success: true, event: { type, gameId } });
+      const docRef = await addDoc(collection(db, 'events'), event);
+      return NextResponse.json({ 
+        success: true, 
+        event: { 
+          type, 
+          gameId,
+          id: docRef.id 
+        } 
+      });
     } catch (error: any) {
       console.error('Firestore error:', error);
       return NextResponse.json(
