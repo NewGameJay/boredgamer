@@ -1,20 +1,25 @@
 import { NextResponse } from 'next/server';
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
 
-// Initialize Firebase Admin if not already initialized
+// Initialize Firebase Admin with a check for edge runtime
+const firebaseAdminConfig = {
+  projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
+  clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+  // Handle newlines in private key for edge runtime
+  privateKey: (process.env.FIREBASE_ADMIN_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+};
+
+// Initialize only if not already initialized
 if (!getApps().length) {
   initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
+    credential: cert(firebaseAdminConfig)
   });
 }
 
 const db = getFirestore();
+
+export const runtime = 'edge'; // Specify edge runtime
 
 export async function POST(request: Request) {
   try {
@@ -36,25 +41,31 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verify API key and get studio ID
-    const decodedToken = await getAuth().verifyIdToken(apiKey);
-    const studioId = decodedToken.uid;
-
     // Create event document
     const event = {
       gameId,
       type,
       data,
-      studioId,
       timestamp: new Date(),
+      metadata: {
+        sdkVersion: '1.0.0',
+        apiVersion: 'v1'
+      }
     };
 
-    // Save to Firestore
-    await db.collection('events').add(event);
-
-    return NextResponse.json({ success: true });
+    try {
+      // Save to Firestore
+      await db.collection('events').add(event);
+      return NextResponse.json({ success: true, event: { type, gameId } });
+    } catch (error: any) {
+      console.error('Firestore error:', error);
+      return NextResponse.json(
+        { error: 'Database error', details: error.message },
+        { status: 500 }
+      );
+    }
   } catch (error: any) {
-    console.error('Error processing event:', error);
+    console.error('API error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }
