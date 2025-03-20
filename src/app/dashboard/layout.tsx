@@ -68,22 +68,28 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { user, signOut } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const [isClient, setIsClient] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setIsClient(true);
+    setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (isClient && !user) {
-      router.push('/sign-in');
+    if (mounted && !loading && !user) {
+      router.replace('/sign-in');
     }
-  }, [isClient, user, router]);
+  }, [mounted, loading, user, router]);
 
-  if (!isClient || !user) {
+  // Don't show anything until we're mounted and loading is complete
+  if (!mounted || loading) {
+    return null;
+  }
+
+  // If we're mounted and not loading but there's no user, return null (we're redirecting)
+  if (!user) {
     return null;
   }
 
