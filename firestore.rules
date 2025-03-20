@@ -7,29 +7,22 @@ service cloud.firestore {
       return request.auth != null;
     }
     
-    // Helper function to check if user is accessing their own data
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+    // Helper function to check if user is a valid studio
+    function isValidStudio() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/studios/$(request.auth.uid));
     }
 
-    // Studio collection rules
+    // Studios collection rules
     match /studios/{studioId} {
-      // Allow read if user is authenticated and owns the document
-      allow read: if isOwner(studioId);
-      
-      // Allow create if user is authenticated and the document ID matches their UID
-      allow create: if isAuthenticated() 
-        && studioId == request.auth.uid
-        && request.resource.data.keys().hasAll(['name', 'email', 'tier', 'features', 'createdAt', 'updatedAt'])
-        && request.resource.data.tier == 'independent';
-      
-      // Allow update if user is authenticated and updating their own document
-      allow update: if isOwner(studioId)
-        && request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(['name', 'tier', 'features', 'updatedAt']);
-      
-      // Never allow delete
-      allow delete: if false;
+      allow read: if isAuthenticated() && request.auth.uid == studioId;
+    }
+
+    // Events collection rules
+    match /events/{eventId} {
+      allow read: if isValidStudio();
+      allow create: if isValidStudio() 
+        && request.resource.data.studioId == request.auth.uid
+        && request.resource.data.keys().hasAll(['gameId', 'studioId', 'type', 'data', 'timestamp']);
     }
   }
 }

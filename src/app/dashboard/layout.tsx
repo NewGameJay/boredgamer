@@ -82,7 +82,7 @@ export default function DashboardLayout({
       <div className="dashboard-sidebar">
         <div className="sidebar-header">
           <div className="sidebar-logo">
-            <span className="header-logo">BOREDGAMER</span>
+            <Link href="/" className="header-logo">BOREDGAMER</Link>
           </div>
         </div>
 

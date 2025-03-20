@@ -62,6 +62,14 @@ body {
   padding: 1.5rem 1rem;
 }
 
+.clipboardbutton:hover {
+  cursor: pointer;
+}
+
+[data-slot="card-content"] {
+  min-height: 500px;
+}
+
 .header-nav {
   display: flex;
   gap: 1.5rem;

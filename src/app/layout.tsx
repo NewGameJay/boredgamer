@@ -15,20 +15,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) { 
+}) { 
   return (
-    <html lang="en" className="h-full bg-black">
-      <body
-        className={`${inter.className} antialiased bg-black text-gray-100 h-full`}
-      >
+    <html lang="en">
+      <body className={inter.className}>
         <AuthProvider>
-          <div className="min-h-screen flex flex-col">
-            <main className="flex-1 mt-16">
-              {children}
-            </main>
-          </div>
+          {children}
         </AuthProvider>
       </body>
     </html>

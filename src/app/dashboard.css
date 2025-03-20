@@ -336,6 +336,18 @@ pre {
   gap: 1rem;
 }
 
+.datatable{
+  width: 100%
+}
+
+.datatable thead tr th{
+text-align: start;
+}
+
+.datatable tbody tr td{
+border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 /* Button Styles */
 [role="button"] {
   display: inline-flex;
