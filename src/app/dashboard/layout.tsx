@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -70,9 +71,19 @@ export default function DashboardLayout({
   const { user, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [isClient, setIsClient] = useState(false);
 
-  if (!user) {
-    router.push('/sign-in');
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (isClient && !user) {
+      router.push('/sign-in');
+    }
+  }, [isClient, user, router]);
+
+  if (!isClient || !user) {
     return null;
   }
 
