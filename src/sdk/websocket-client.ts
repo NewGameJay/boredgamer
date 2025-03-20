@@ -10,6 +10,7 @@ export class WebSocketClient {
   constructor(private config: BoredGamerConfig) {}
 
   async connect(): Promise<void> {
+    if (typeof window === 'undefined') return;
     if (this.ws?.readyState === WebSocket.OPEN) {
       return;
     }
@@ -48,28 +49,26 @@ export class WebSocketClient {
   }
 
   send(data: any): void {
+    if (typeof window === 'undefined') return;
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data));
-    } else {
-      console.warn('WebSocket not connected, message not sent');
     }
   }
 
-  onMessage(handler: ((data: any) => void) | null): void {
+  onMessage(handler: (data: any) => void): void {
     this.messageHandler = handler;
   }
 
-  disconnect(): void {
+  dispose(): void {
     if (this.ws) {
       this.ws.close();
       this.ws = null;
     }
-    this.messageHandler = null;
   }
 
   private handleDisconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('Max reconnection attempts reached');
+      console.log('Max reconnection attempts reached');
       return;
     }
 
@@ -80,6 +79,6 @@ export class WebSocketClient {
       this.connect().catch(error => {
         console.error('Reconnection failed:', error);
       });
-    }, this.reconnectInterval * this.reconnectAttempts);
+    }, this.reconnectInterval * Math.pow(2, this.reconnectAttempts - 1));
   }
 }
