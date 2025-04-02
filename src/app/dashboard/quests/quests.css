@@ -1,0 +1,6 @@
+.quest-card:hover {
+  transform: scale(1.01);
+  border-color: rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}

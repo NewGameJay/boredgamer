@@ -4,13 +4,25 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { format, formatDistanceToNow } from 'date-fns';
+import { useToast } from "@/components/ui/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { db } from '@/lib/firebase';
 import { collection, doc, setDoc, getDocs, deleteDoc, query, where, orderBy, limit, onSnapshot, addDoc } from 'firebase/firestore';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useRouter } from 'next/navigation';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { format, formatDistanceToNow } from 'date-fns';
-import { useToast } from "@/components/ui/use-toast";
+import '@/app/dashboard/quests/quests.css';
 
 interface QuestCondition {
   type: string;      // e.g., 'score', 'time', 'collection', 'achievement'
@@ -54,11 +66,26 @@ interface FormData {
 }
 
 export default function QuestDashboard() {
-  const { user } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('create');
-  const [manageTab, setManageTab] = useState('live');
+  const { user } = useAuth();
   const [quests, setQuests] = useState<Quest[]>([]);
+  const [manageTab, setManageTab] = useState('live');
+  const [expandedQuest, setExpandedQuest] = useState<string | null>(null);
+  const [playerName, setPlayerName] = useState<string>('');
+  const [playerProgress, setPlayerProgress] = useState<Record<string, number>>({});
+  const [selectedQuest, setSelectedQuest] = useState<Quest | null>(null);
+  const [isEditingDates, setIsEditingDates] = useState(false);
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [isEditingStatus, setIsEditingStatus] = useState(false);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    description: '',
+    startDate: '',
+    endDate: '',
+    status: ''
+  });
+  const [activeTab, setActiveTab] = useState('create');
   const [formData, setFormData] = useState<FormData>({
     name: '',
     description: '',
@@ -68,9 +95,6 @@ export default function QuestDashboard() {
     rewards: [{ type: 'points', amount: 0 }],
     isTemplate: false
   });
-  const [expandedQuest, setExpandedQuest] = useState<string | null>(null);
-  const [playerName, setPlayerName] = useState<string>('');
-  const [playerProgress, setPlayerProgress] = useState<Record<string, number>>({});
   const { toast } = useToast();
 
   // Filtered and sorted quests based on date
@@ -270,19 +294,54 @@ export default function QuestDashboard() {
     }
   };
 
+  // Quest management functions
+  const handleUpdateQuest = async (questId: string, updates: Partial<Quest>) => {
+    try {
+      const questRef = doc(db, 'quests', questId);
+      await setDoc(questRef, updates, { merge: true });
+      toast({
+        title: "Success",
+        description: "Quest updated successfully",
+      });
+    } catch (error) {
+      console.error('Error updating quest:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update quest",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteQuest = async (questId: string) => {
+    try {
+      await deleteDoc(doc(db, 'quests', questId));
+      toast({
+        title: "Success",
+        description: "Quest deleted successfully",
+      });
+      setIsConfirmingDelete(false);
+    } catch (error) {
+      console.error('Error deleting quest:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete quest",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="container mx-auto py-10">
       <h1 className="text-4xl font-bold mb-8">Quest Dashboard</h1>
-      
-      <Tabs defaultValue="create" className="space-y-4">
-        <TabsList className="bg-muted text-muted-foreground inline-flex h-9 w-fit items-center justify-center rounded-lg p-[3px]">
+      <Tabs defaultValue="create" value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
           <TabsTrigger value="create">Create Quest</TabsTrigger>
           <TabsTrigger value="manage">Manage Quests</TabsTrigger>
           <TabsTrigger value="setup">Component Plugin</TabsTrigger>
         </TabsList>
 
-        {/* Create Quest Tab */}
-        <TabsContent value="create" className="space-y-4">
+        <TabsContent value="create">
           <Card>
             <CardHeader>
               <CardTitle>Create New Quest</CardTitle>
@@ -463,12 +522,11 @@ export default function QuestDashboard() {
           </Card>
         </TabsContent>
 
-        {/* Manage Quests Tab */}
         <TabsContent value="manage">
           <Card>
             <CardContent>
-              <Tabs value={manageTab} onValueChange={setManageTab} className="w-full">
-                <TabsList className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1">
+              <Tabs value={manageTab} onValueChange={setManageTab}>
+                <TabsList>
                   <TabsTrigger value="previous" className="px-6">Previous</TabsTrigger>
                   <TabsTrigger value="live" className="px-6">Live</TabsTrigger>
                   <TabsTrigger value="upcoming" className="px-6">Upcoming</TabsTrigger>
@@ -485,21 +543,21 @@ export default function QuestDashboard() {
                           }`}
                         >
                           <div 
-                            className={`p-4 cursor-pointer transition-colors duration-200 ${
+                            className={`p-4 cursor-pointer transition-colors duration-200 quest-card ${
                               expandedQuest === quest.id ? 'bg-muted/50' : 'hover:bg-muted/30'
                             }`}
                             onClick={() => setExpandedQuest(expandedQuest === quest.id ? null : quest.id)}
                           >
                             <div className="grid grid-cols-5 gap-6 items-center text-sm">
-                              <div className="space-y-1.5">
-                                <div className="font-semibold tracking-tight" style={{ fontSize: '20px', marginBottom: '10px' }}>{quest.name}</div>
+                              <div className="space-y-1.5" style={{ display: 'flex', flexDirection: 'row', alignItems: 'end', gap: '1rem' }}>
+                                <div className="font-semibold tracking-tight" style={{ fontSize: '20px', marginBottom: '0px' }}>{quest.name}</div>
                                 <div className="text-xs text-muted-foreground line-clamp-1">{quest.description}</div>
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between' }}>
                               <div className="text-center space-y-1" style={{ display: 'flex', flexDirection: 'row' }}>
-                                <div>{format(new Date(quest.startDate), 'MMMM d')}</div>
+                                <div>{format(new Date(quest.startDate), 'MMMM d h:mm a')}</div>
                                 <div style={{ margin: '0 1rem' }}>-</div>
-                                <div>{format(new Date(quest.endDate), 'MMMM d')}</div>
+                                <div>{format(new Date(quest.endDate), 'MMMM d h:mm a')}</div>
 
                               </div>
                               <div className="text-center space-y-1" style={{ display: 'flex', flexDirection: 'row' }}>
@@ -525,6 +583,62 @@ export default function QuestDashboard() {
                           {expandedQuest === quest.id && (
                             <div className="px-4 pb-4 border-t bg-muted/30">
                               <div className="pt-4 space-y-4">
+                                <div className="flex justify-between items-center mb-4">
+                                  <div className="flex gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setSelectedQuest(quest);
+                                        setEditForm({
+                                          ...editForm,
+                                          startDate: quest.startDate,
+                                          endDate: quest.endDate
+                                        });
+                                        setIsEditingDates(true);
+                                      }}
+                                    >
+                                      Change Dates
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setSelectedQuest(quest);
+                                        setEditForm({
+                                          ...editForm,
+                                          name: quest.name,
+                                          description: quest.description
+                                        });
+                                        setIsEditingDetails(true);
+                                      }}
+                                    >
+                                      Edit Details
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setSelectedQuest(quest);
+                                        setEditForm({ ...editForm, status: quest.status });
+                                        setIsEditingStatus(true);
+                                      }}
+                                    >
+                                      Change Status
+                                    </Button>
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() => {
+                                        setSelectedQuest(quest);
+                                        setIsConfirmingDelete(true);
+                                      }}
+                                    >
+                                      Delete Quest
+                                    </Button>
+                                  </div>
+                                </div>
+
                                 <div className="flex gap-4">
                                   <div className="flex-1">
                                     <label className="text-sm font-medium mb-2 block text-muted-foreground">
@@ -588,7 +702,6 @@ export default function QuestDashboard() {
           </Card>
         </TabsContent>
 
-        {/* Component Plugin Tab */}
         <TabsContent value="setup">
           <Card style={{ maxWidth: '1020px' }}>
             <CardHeader>
@@ -727,6 +840,163 @@ const questProgress = {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Modals */}
+      <Dialog open={isEditingDates} onOpenChange={setIsEditingDates}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Quest Dates</DialogTitle>
+            <DialogDescription>
+              Update the start and end dates for this quest.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="startDate">Start Date</Label>
+              <Input
+                id="startDate"
+                type="datetime-local"
+                value={editForm.startDate}
+                onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="endDate">End Date</Label>
+              <Input
+                id="endDate"
+                type="datetime-local"
+                value={editForm.endDate}
+                onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditingDates(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              if (selectedQuest) {
+                handleUpdateQuest(selectedQuest.id, {
+                  startDate: editForm.startDate,
+                  endDate: editForm.endDate
+                });
+                setIsEditingDates(false);
+              }
+            }}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditingDetails} onOpenChange={setIsEditingDetails}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Quest Details</DialogTitle>
+            <DialogDescription>
+              Update the name and description of this quest.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="name">Quest Name</Label>
+              <Input
+                id="name"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="description">Description</Label>
+              <Input
+                id="description"
+                value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditingDetails(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              if (selectedQuest) {
+                handleUpdateQuest(selectedQuest.id, {
+                  name: editForm.name,
+                  description: editForm.description
+                });
+                setIsEditingDetails(false);
+              }
+            }}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditingStatus} onOpenChange={setIsEditingStatus}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Quest Status</DialogTitle>
+            <DialogDescription>
+              Update the status of this quest.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="status">Status</Label>
+              <select
+                id="status"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                value={editForm.status}
+                onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+              >
+                <option value="active">Active</option>
+                <option value="completed">Completed</option>
+                <option value="draft">Draft</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditingStatus(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              if (selectedQuest) {
+                handleUpdateQuest(selectedQuest.id, {
+                  status: editForm.status as Quest['status']
+                });
+                setIsEditingStatus(false);
+              }
+            }}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isConfirmingDelete} onOpenChange={setIsConfirmingDelete}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Quest</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this quest? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsConfirmingDelete(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => selectedQuest && handleDeleteQuest(selectedQuest.id)}
+            >
+              Delete Quest
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

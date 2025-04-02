@@ -592,3 +592,9 @@ input[type="checkbox"]:checked {
 .requiredButton{
  border-radius: 0.375rem;
 }
+
+.quest-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+}
