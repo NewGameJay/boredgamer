@@ -39,27 +39,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          // Get additional studio data from Firestore
-          const studioDoc = await getDoc(doc(db, 'studios', firebaseUser.uid));
-          const data = studioDoc.data();
-          
-          if (data) {
-            // Set auth cookie when user is authenticated
-            Cookies.set('auth', 'true', { 
-              expires: 7, // 7 days
-              sameSite: 'strict',
-              secure: process.env.NODE_ENV === 'production'
-            });
-
+          const userDoc = await getDoc(doc(db, 'studios', firebaseUser.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data() as Studio;
             setState({
               user: {
+                ...userData,
                 id: firebaseUser.uid,
-                name: data.name,
-                email: data.email,
-                tier: data.tier,
-                features: data.features,
-                createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
-                updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt)
+                studioId: firebaseUser.uid
               },
               loading: false,
               error: null
@@ -67,11 +54,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } catch (error) {
           console.error('Error fetching user data:', error);
-          setState({ user: null, loading: false, error: 'Error fetching user data' });
+          setState({ user: null, loading: false, error: 'Failed to fetch user data' });
         }
       } else {
-        // Remove auth cookie when user is not authenticated
-        Cookies.remove('auth');
         setState({ user: null, loading: false, error: null });
       }
     });
@@ -79,52 +64,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const signUp = async ({ studioName, email, password }: SignUpData) => {
+  const signUp = async ({ studioName, email, password }: SignUpData): Promise<void> => {
     try {
-      // Create Firebase Auth user
+      setState({ user: null, loading: true, error: null });
       const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, email, password);
+      const userId = firebaseUser.uid;
       
-      await createStudioDocument(firebaseUser.uid, studioName, email);
+      const studioData = {
+        name: studioName,
+        email: email,
+        studioId: userId,  
+        tier: 'independent' as const,
+        features: {
+          leaderboards: true,
+          quests: false,
+          tournaments: false,
+          matchmaking: false,
+          creatorProgram: false
+        },
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      await setDoc(doc(db, 'studios', userId), studioData);
+
+      setState({
+        user: {
+          id: userId,
+          ...studioData
+        },
+        loading: false,
+        error: null
+      });
     } catch (error) {
-      console.error('Error during sign up:', error);
-      setState(prev => ({ ...prev, error: 'Failed to create account' }));
+      console.error('Error signing up:', error);
+      setState({ user: null, loading: false, error: 'Failed to sign up' });
       throw error;
     }
-  };
-
-  const createStudioDocument = async (userId: string, studioName: string, email: string) => {
-    const now = Timestamp.now();
-    const studioData: Omit<Studio, 'id'> = {
-      name: studioName,
-      email,
-      tier: 'independent',
-      features: {
-        leaderboards: true,
-        quests: false,
-        tournaments: false,
-        matchmaking: false,
-        creatorProgram: false
-      },
-      createdAt: now.toDate(),
-      updatedAt: now.toDate()
-    };
-
-    // Save to Firestore with proper Timestamp objects
-    await setDoc(doc(db, 'studios', userId), {
-      ...studioData,
-      createdAt: now,
-      updatedAt: now
-    });
-
-    // Update local state
-    setState({
-      user: {
-        id: userId,
-        ...studioData
-      },
-      loading: false,
-      error: null
-    });
   };
 
   const signInWithGoogle = async () => {
@@ -137,7 +113,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!studioDoc.exists()) {
         // Create new studio document for Google sign-in
         const studioName = firebaseUser.displayName || 'My Studio';
-        await createStudioDocument(firebaseUser.uid, studioName, firebaseUser.email!);
+        const studioData = {
+          name: studioName,
+          email: firebaseUser.email,
+          studioId: firebaseUser.uid,
+          tier: 'independent' as const,
+          features: {
+            leaderboards: true,
+            quests: false,
+            tournaments: false,
+            matchmaking: false,
+            creatorProgram: false
+          },
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        await setDoc(doc(db, 'studios', firebaseUser.uid), studioData);
       }
       
       // User data will be fetched by the onAuthStateChanged listener

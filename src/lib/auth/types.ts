@@ -1,5 +1,6 @@
 export interface Studio {
   id: string;
+  studioId: string;  // Added for compatibility
   name: string;
   email: string;
   tier: 'independent' | 'studio' | 'ecosystem';

@@ -18,15 +18,6 @@ export default function AuthLayout({
         maxWidth: '24rem',
         textAlign: 'center'
       }}>
-        <img
-          src="/logo.svg"
-          alt="BoredGamer"
-          style={{
-            height: '3rem',
-            width: 'auto',
-            margin: '0 auto'
-          }}
-        />
       </div>
       {children}
     </div>

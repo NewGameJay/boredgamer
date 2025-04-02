@@ -136,7 +136,7 @@ export default function Home() {
       <header className="header">
         <div className="container header-container">
           <div className="header-brand">
-            <h1 className="header-logo">BoredGamer</h1>
+            <Link href="/" className="header-logo">BoredGamer</Link>
             <nav className="header-nav">
               <Link href="#features" className="nav-link">Features</Link>
               <Link href="#docs" className="nav-link">Documentation</Link>

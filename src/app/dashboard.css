@@ -49,28 +49,32 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  border-radius: 0.75rem;
-  color: var(--text);
+  border-radius: 0.5rem;
+  color: rgba(255, 255, 255, 0.7);
   text-decoration: none;
   transition: all 0.2s ease;
-  font-weight: 500;
+  font-weight: normal;
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
 }
 
 .nav-item.active {
-  background: var(--primary);
-  color: var(--background);
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-weight: 600;
 }
 
 .nav-item svg {
   width: 1.25rem;
   height: 1.25rem;
   opacity: 0.7;
+  transition: opacity 0.2s ease;
 }
 
+.nav-item:hover svg,
 .nav-item.active svg {
   opacity: 1;
 }
@@ -538,4 +542,53 @@ input[type="checkbox"]:checked {
 .timestamp {
   color: #9ca3af;
   font-size: 0.875rem;
+}
+
+.addButton {
+  width: 32%;
+  height: 33.5px;
+  background-color: rgba(255, 255, 255, 0.05);
+  color: white;
+  border: none;
+  cursor: pointer;
+  border-radius: 0.375rem;
+}
+
+.addButton:hover {
+  background-image: linear-gradient(to right, #2563eb, #7c3aed);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+
+.removeButton{
+  width: 32%;
+  height: 33.5px;
+  background-color: rgba(255, 255, 255, 0.05);
+  color: white;
+  border: none;
+  cursor: pointer;
+  border-radius: 0.375rem;
+}
+
+.removeButton:hover {
+  background-image: linear-gradient(to right, #2563eb, #7c3aed);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.requiredButton:hover {
+  background-image: linear-gradient(to right, #2563eb, #7c3aed);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.requiredButton.required {
+  background-image: linear-gradient(to right, #2563eb, #7c3aed);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.requiredButton{
+ border-radius: 0.375rem;
 }

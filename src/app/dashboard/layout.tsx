@@ -99,7 +99,7 @@ export default function DashboardLayout({
       <div className="dashboard-sidebar">
         <div className="sidebar-header">
           <div className="sidebar-logo">
-            <Link href="/" className="header-logo">BOREDGAMER</Link>
+            <Link href="/" className="header-logo">boredgamer</Link>
           </div>
         </div>
 

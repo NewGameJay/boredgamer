@@ -17,12 +17,29 @@ service cloud.firestore {
       allow read: if isAuthenticated() && request.auth.uid == studioId;
     }
 
+    // Leaderboards collection rules
+    match /Leaderboards/{leaderboardId} {
+      allow read: if true;
+      allow write: if isValidStudio() && 
+        request.resource.data.studioId == request.auth.uid &&
+        request.resource.data.createdBy == request.auth.uid;
+    }
+
     // Events collection rules
     match /events/{eventId} {
       allow read: if isValidStudio();
       allow create: if isValidStudio() 
         && request.resource.data.studioId == request.auth.uid
         && request.resource.data.keys().hasAll(['gameId', 'studioId', 'type', 'data', 'timestamp']);
+    }
+
+    // Quests collection rules
+    match /quests/{questId} {
+      allow read: if isValidStudio();
+      allow create, update: if isValidStudio() && 
+        request.resource.data.studioId == request.auth.uid;
+      allow delete: if isValidStudio() && 
+        resource.data.studioId == request.auth.uid;
     }
   }
 }

@@ -49,7 +49,7 @@ export default function Dashboard() {
             <div className="tier-info">
               <div className="tier-name">{user?.tier} Plan</div>
               <div className="tier-date">
-                Since {user?.createdAt?.toLocaleDateString()}
+                Since {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : ''}
               </div>
             </div>
           </div>
