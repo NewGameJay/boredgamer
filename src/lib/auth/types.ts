@@ -10,6 +10,8 @@ export interface Studio {
     tournaments: boolean;
     matchmaking: boolean;
     creatorProgram: boolean;
+    communities?: boolean;
+    affiliates?: boolean;
   };
   createdAt: Date;
   updatedAt: Date;

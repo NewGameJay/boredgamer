@@ -1,0 +1,115 @@
+.tournament-card:hover {
+  transform: scale(1.01);
+  border-color: rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* Modal Styles */
+.tournament-modal {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  max-width: 400px !important;
+  width: 90% !important;
+  margin: 0 !important;
+  z-index: 50 !important;
+  background-color: rgb(30, 30, 30) !important;
+  padding: 1rem !important;
+}
+
+/* Input and Button Styles */
+input {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: white !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+input:focus {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.05) !important;
+}
+
+input::placeholder {
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+
+button {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: white;
+  border: none;
+  cursor: pointer;
+  border-radius: 0.375rem;
+  padding: 0.5rem 1rem;
+}
+
+button:hover {
+  background-image: linear-gradient(to right, #2563eb, #7c3aed);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+/* Status Colors */
+.status-active {
+  color: #10b981 !important;
+}
+
+.status-completed {
+  color: #6366f1 !important;
+}
+
+.status-draft {
+  color: #94a3b8 !important;
+}
+
+.status-archived {
+  color: #6b7280 !important;
+}
+
+/* Card and Layout Styles */
+.tournament-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.tournament-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tournament-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* Form Styles */
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .tournament-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .tournament-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .tournament-modal {
+    width: 95% !important;
+    margin: 1rem !important;
+  }
+}

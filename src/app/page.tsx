@@ -34,21 +34,20 @@ export default function Home() {
         "Single-elimination, round-robin, and point-based tournaments",
         "Real-time tracking of match results",
         "Entry fees & prize pools",
-        "Auto-generated brackets & matchmaking"
+        "Auto-generated brackets"
       ]
     },
     {
-      title: "Multiplayer Matchmaking API",
-      description: "Advanced PVP matchmaking for multiplayer games.",
+      title: "Communities & Referrals API",
+      description: "Community referral and whitelisting tools.",
       features: [
-        "Skill & web3-based matchmaking",
-        "Multiplayer Server Offering (Colyseus, Photon)",
-        "Custom queue logic and party rules",
-        "Real-time player analytics"
+        "Create and manage communities",
+        "Whitelisting tools",
+        "Referral analytics"
       ]
     },
     {
-      title: "Creator & Affiliate API",
+      title: "Creator & Affiliates API",
       description: "Complete referral system for content creators and affiliates.",
       features: [
         "Custom creator referral codes",
@@ -76,7 +75,7 @@ export default function Home() {
       price: "$99",
       features: [
         "Full Access to Leaderboard API",
-        "Tournament API (1% Prize Pool Share)",
+        "Tournament API (5% Prize Pool Share)",
         "Progression and Live Events API (5% Revenue Share)",
         "Basic Analytics Dashboard",
         "15-Day Data Retention"
@@ -88,10 +87,9 @@ export default function Home() {
       price: "$249",
       features: [
         "Full Access to Leaderboard API",
-        "Full Access to Tournament API",
+        "Full Access to Tournament API (2.5% Prize Pool Share)",
+        "Full Access to Communities API",
         "Progression and Live Events API (2.5% Revenue Share)",
-        "Creator and Affiliate API (1% Revenue Share)",
-        "Game and Marketplace Analytics Dashboard",
         "30-Day Data Retention"
       ],
       popular: true
@@ -104,12 +102,11 @@ export default function Home() {
         "Full Access to Leaderboard API",
         "Full Access to Tournament API",
         "Full Access to Quests and Challenges API",
-        "Full Access to Matchmaking and Party API",
+        "Full Access to Communities API",
         "Progression and Live Events API (1.5% Revenue Share)",
-        "Creator and Affiliate API (1% Revenue Share)",
+        "Affiliates API (2% Revenue Share)",
         "Game Analytics Dashboard",
-        "180-Day Data Retention",
-        "24/7 Dedicated Support"
+        "180-Day Data Retention"
       ]
     },
     {
@@ -120,9 +117,9 @@ export default function Home() {
         "Full Access to Leaderboard API",
         "Full Access to Tournament API",
         "Full Access to Quests and Challenges API",
-        "Full Access to Matchmaking and Party API",
         "Full Access to Progression and Live Events API",
-        "Creator and Affiliate API (1% Revenue Share)",
+        "Full Access to Communities API",
+        "Full Access to Affiliates API (1% Revenue Share)",
         "Full Analytics Dashboard",
         "Unlimited Data Retention",
         "24/7 Dedicated Support"
@@ -136,7 +133,7 @@ export default function Home() {
       <header className="header">
         <div className="container header-container">
           <div className="header-brand">
-            <Link href="/" className="header-logo">BoredGamer</Link>
+            <Link href="/" className="header-logo">boredgamer</Link>
             <nav className="header-nav">
               <Link href="#features" className="nav-link">Features</Link>
               <Link href="#docs" className="nav-link">Documentation</Link>
@@ -157,12 +154,12 @@ export default function Home() {
         <div className="container">
           <div className="hero-content">
             <h1 className="hero-title">
-              One API Suite For All
+              One API Suite 
               <br />
-               Your Game Features
+              To Engage Your Players
             </h1>
             <p className="hero-description">
-              Integrate live events, leaderboards, quests, tournaments, and more into your game with just a few API calls.
+              Integrate leaderboards, quests, tournaments, battle passes, and more into your game with just a few API calls.
             </p>
             <div className="hero-actions">
               <Link href="/sign-up" className="btn btn-primary btn-lg">

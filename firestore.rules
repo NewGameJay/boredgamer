@@ -41,5 +41,25 @@ service cloud.firestore {
       allow delete: if isValidStudio() && 
         resource.data.studioId == request.auth.uid;
     }
+
+    // Tournaments collection rules
+    match /tournaments/{tournamentId} {
+      // Allow reading if the user is authenticated and the tournament belongs to their studio
+      allow read: if isAuthenticated() && 
+        (resource == null || resource.data.studioId == request.auth.uid);
+      
+      // Allow creating if user is authenticated and sets their ID as studioId
+      allow create: if isAuthenticated() && 
+        request.resource.data.studioId == request.auth.uid;
+      
+      // Allow updates if user owns the tournament
+      allow update: if isAuthenticated() && 
+        resource.data.studioId == request.auth.uid && 
+        request.resource.data.studioId == request.auth.uid;
+      
+      // Allow deletion if user owns the tournament
+      allow delete: if isAuthenticated() && 
+        resource.data.studioId == request.auth.uid;
+    }
   }
 }

@@ -583,8 +583,32 @@ export default function QuestDashboard() {
                           {expandedQuest === quest.id && (
                             <div className="px-4 pb-4 border-t bg-muted/30">
                               <div className="pt-4 space-y-4">
-                                <div className="flex justify-between items-center mb-4">
-                                  <div className="flex gap-2">
+                                <div className="flex justify-between items-center mb-4" style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', padding: '0 1rem .5rem 1rem' }}>
+                                <div className="flex gap-4">
+                                  <div className="flex-1">
+                                    <label className="text-sm font-medium mb-2 block text-muted-foreground">
+                                      Check Player Status
+                                    </label>
+                                    <div className="flex gap-2">
+                                      <input
+                                        type="text"
+                                        placeholder="Enter player name"
+                                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={playerName}
+                                        onChange={(e) => setPlayerName(e.target.value)}
+                                      />
+                                      <Button 
+                                        variant="secondary"
+                                        style={{ marginLeft: '0.5rem' }}
+                                        size="sm"
+                                        onClick={() => fetchPlayerProgress(quest.id, playerName)}
+                                      >
+                                        Check
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                                  <div className="flex gap-2" style={{ display: 'flex', alignItems: 'end' }}>
                                     <Button
                                       variant="outline"
                                       size="sm"
@@ -612,6 +636,7 @@ export default function QuestDashboard() {
                                         });
                                         setIsEditingDetails(true);
                                       }}
+                                      style={{ marginLeft: '0.5rem', marginRight: '0.5rem' }}
                                     >
                                       Edit Details
                                     </Button>
@@ -623,6 +648,7 @@ export default function QuestDashboard() {
                                         setEditForm({ ...editForm, status: quest.status });
                                         setIsEditingStatus(true);
                                       }}
+                                      style={{ marginRight: '0.5rem' }}
                                     >
                                       Change Status
                                     </Button>
@@ -636,30 +662,6 @@ export default function QuestDashboard() {
                                     >
                                       Delete Quest
                                     </Button>
-                                  </div>
-                                </div>
-
-                                <div className="flex gap-4">
-                                  <div className="flex-1">
-                                    <label className="text-sm font-medium mb-2 block text-muted-foreground">
-                                      Check Player Status
-                                    </label>
-                                    <div className="flex gap-2">
-                                      <input
-                                        type="text"
-                                        placeholder="Enter player name"
-                                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                                        value={playerName}
-                                        onChange={(e) => setPlayerName(e.target.value)}
-                                      />
-                                      <Button 
-                                        variant="secondary"
-                                        size="sm"
-                                        onClick={() => fetchPlayerProgress(quest.id, playerName)}
-                                      >
-                                        Check
-                                      </Button>
-                                    </div>
                                   </div>
                                 </div>
 
@@ -843,14 +845,11 @@ const questProgress = {
 
       {/* Modals */}
       <Dialog open={isEditingDates} onOpenChange={setIsEditingDates}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[400px] quest-modal">
+          <DialogHeader className="pb-4">
             <DialogTitle>Change Quest Dates</DialogTitle>
-            <DialogDescription>
-              Update the start and end dates for this quest.
-            </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-3">
             <div className="grid gap-2">
               <Label htmlFor="startDate">Start Date</Label>
               <Input
@@ -870,10 +869,8 @@ const questProgress = {
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditingDates(false)}>
-              Cancel
-            </Button>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setIsEditingDates(false)}>Cancel</Button>
             <Button onClick={() => {
               if (selectedQuest) {
                 handleUpdateQuest(selectedQuest.id, {
@@ -882,22 +879,17 @@ const questProgress = {
                 });
                 setIsEditingDates(false);
               }
-            }}>
-              Save Changes
-            </Button>
+            }}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={isEditingDetails} onOpenChange={setIsEditingDetails}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader className="pb-4">
             <DialogTitle>Edit Quest Details</DialogTitle>
-            <DialogDescription>
-              Update the name and description of this quest.
-            </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-3">
             <div className="grid gap-2">
               <Label htmlFor="name">Quest Name</Label>
               <Input
@@ -915,10 +907,8 @@ const questProgress = {
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditingDetails(false)}>
-              Cancel
-            </Button>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setIsEditingDetails(false)}>Cancel</Button>
             <Button onClick={() => {
               if (selectedQuest) {
                 handleUpdateQuest(selectedQuest.id, {
@@ -927,22 +917,17 @@ const questProgress = {
                 });
                 setIsEditingDetails(false);
               }
-            }}>
-              Save Changes
-            </Button>
+            }}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={isEditingStatus} onOpenChange={setIsEditingStatus}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader className="pb-4">
             <DialogTitle>Change Quest Status</DialogTitle>
-            <DialogDescription>
-              Update the status of this quest.
-            </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-3">
             <div className="grid gap-2">
               <Label htmlFor="status">Status</Label>
               <select
@@ -958,10 +943,8 @@ const questProgress = {
               </select>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditingStatus(false)}>
-              Cancel
-            </Button>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setIsEditingStatus(false)}>Cancel</Button>
             <Button onClick={() => {
               if (selectedQuest) {
                 handleUpdateQuest(selectedQuest.id, {
@@ -969,30 +952,26 @@ const questProgress = {
                 });
                 setIsEditingStatus(false);
               }
-            }}>
-              Save Changes
-            </Button>
+            }}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={isConfirmingDelete} onOpenChange={setIsConfirmingDelete}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader className="pb-4">
             <DialogTitle>Delete Quest</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete this quest? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsConfirmingDelete(false)}>
-              Cancel
-            </Button>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setIsConfirmingDelete(false)}>Cancel</Button>
             <Button
               variant="destructive"
               onClick={() => selectedQuest && handleDeleteQuest(selectedQuest.id)}
             >
-              Delete Quest
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>

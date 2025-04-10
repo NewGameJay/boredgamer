@@ -4,7 +4,18 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { SDKSetup } from '@/components/sdk/sdk-setup';
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  console.log('Dashboard state:', { user, loading });
+
+  if (loading) {
+    console.log('Dashboard is loading...');
+    return <div className="p-4">Loading...</div>;
+  }
+
+  if (!user) {
+    console.log('No user found, redirecting to sign in...');
+    return <div className="p-4">Please sign in to access the dashboard.</div>;
+  }
 
   return (
     <div>

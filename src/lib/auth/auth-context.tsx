@@ -36,12 +36,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
+    console.log('Setting up auth state listener...');
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log('Auth state changed:', { firebaseUser });
       if (firebaseUser) {
+        // Set auth cookie when user is authenticated
+        Cookies.set('auth', 'true', { expires: 7 });
         try {
           const userDoc = await getDoc(doc(db, 'studios', firebaseUser.uid));
+          console.log('Fetched user doc:', { exists: userDoc.exists(), data: userDoc.data() });
           if (userDoc.exists()) {
             const userData = userDoc.data() as Studio;
+            console.log('Setting user state with:', userData);
             setState({
               user: {
                 ...userData,
@@ -51,12 +57,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               loading: false,
               error: null
             });
+          } else {
+            console.log('No studio document found for user');
+            setState({ user: null, loading: false, error: 'No studio document found' });
           }
         } catch (error) {
           console.error('Error fetching user data:', error);
           setState({ user: null, loading: false, error: 'Failed to fetch user data' });
         }
       } else {
+        // Remove auth cookie when user is not authenticated
+        Cookies.remove('auth');
         setState({ user: null, loading: false, error: null });
       }
     });
@@ -80,7 +91,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           quests: false,
           tournaments: false,
           matchmaking: false,
-          creatorProgram: false
+          creatorProgram: false,
+          communities: false,
+          affiliates: false
         },
         createdAt: new Date(),
         updatedAt: new Date()
@@ -115,7 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const studioName = firebaseUser.displayName || 'My Studio';
         const studioData = {
           name: studioName,
-          email: firebaseUser.email,
+          email: firebaseUser.email || '',
           studioId: firebaseUser.uid,
           tier: 'independent' as const,
           features: {
@@ -123,15 +136,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             quests: false,
             tournaments: false,
             matchmaking: false,
-            creatorProgram: false
+            creatorProgram: false,
+            communities: false,
+            affiliates: false
           },
           createdAt: new Date(),
           updatedAt: new Date()
         };
         await setDoc(doc(db, 'studios', firebaseUser.uid), studioData);
+        
+        // Set the user state immediately after creating the document
+        setState({
+          user: {
+            id: firebaseUser.uid,
+            ...studioData
+          },
+          loading: false,
+          error: null
+        });
+      } else {
+        // If document exists, fetch and set the user state
+        const userData = studioDoc.data() as Studio;
+        setState({
+          user: {
+            ...userData,
+            id: firebaseUser.uid,
+            studioId: firebaseUser.uid
+          },
+          loading: false,
+          error: null
+        });
       }
-      
-      // User data will be fetched by the onAuthStateChanged listener
     } catch (error) {
       console.error('Error during Google sign in:', error);
       setState(prev => ({ ...prev, error: 'Failed to sign in with Google' }));
@@ -143,7 +178,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { user: firebaseUser } = await signInWithEmailAndPassword(auth, email, password);
       
-      // User data will be fetched by the onAuthStateChanged listener
+      // Fetch and set user data immediately
+      const userDoc = await getDoc(doc(db, 'studios', firebaseUser.uid));
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as Studio;
+        setState({
+          user: {
+            ...userData,
+            id: firebaseUser.uid,
+            studioId: firebaseUser.uid
+          },
+          loading: false,
+          error: null
+        });
+      } else {
+        setState({ user: null, loading: false, error: 'No studio document found' });
+      }
     } catch (error) {
       console.error('Error during sign in:', error);
       setState(prev => ({ ...prev, error: 'Invalid email or password' }));

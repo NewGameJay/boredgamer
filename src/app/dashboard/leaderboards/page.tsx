@@ -568,24 +568,22 @@ Leaderboard->SubmitScore(1000.0f, "PlayerName");`}
                                   required
                                 />
                                 <Button 
-                                  style={{ width: "10%", height: "33.5px", margin: "0 20px", backgroundColor: "transparent", color: "white" }} 
+                                  style={{ width: "15%", height: "33.5px", margin: "0 20px", backgroundColor: "transparent", color: "white" }} 
                                   variant="ghost" 
-                                  size="icon"
                                   onClick={() => toggleRequired(field.id)}
                                   className={`requiredButton ${field.required ? 'required' : 'not-required'}`}
                                   type="button"
                                 >
-                                  <span className="sr-only">{field.required ? 'Required' : 'Not Required'}</span>
+                                  {field.required ? 'Required' : 'Optional'}
                                 </Button>
                                 <Button 
                                   style={{ width: "15%", height: "33.5px" }} 
                                   variant="ghost" 
-                                  size="icon"
                                   onClick={() => removeField(field.id)}
                                   className="removeButton"
                                   type="button"
                                 >
-                                  <span className="sr-only">Remove field</span>
+                                  Remove
                                 </Button>
                               </div>
                             ))}

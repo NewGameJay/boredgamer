@@ -1,5 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Domain configuration
+  async rewrites() {
+    return [
+      {
+        source: '/:game/:community',
+        destination: '/[game]/[community]',
+      },
+    ];
+  },
   reactStrictMode: true,
   swcMinify: true,
   images: {
