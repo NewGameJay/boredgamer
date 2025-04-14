@@ -14,18 +14,16 @@ service cloud.firestore {
 
     // Users collection rules
     match /users/{userId} {
+      allow create: if isAuthenticated() && request.auth.uid == userId;
       allow read: if isAuthenticated() && request.auth.uid == userId;
-      allow update: if isAuthenticated() && request.auth.uid == userId &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['name', 'updatedAt']);
+      allow update: if isAuthenticated() && request.auth.uid == userId;
     }
 
     // Studios collection rules
     match /studios/{studioId} {
+      allow create: if isAuthenticated() && request.auth.uid == studioId;
       allow read: if isAuthenticated() && request.auth.uid == studioId;
-      allow update: if isAuthenticated() && request.auth.uid == studioId &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['name', 'updatedAt']);
+      allow update: if isAuthenticated() && request.auth.uid == studioId;
     }
 
     // Leaderboards collection rules
