@@ -40,14 +40,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       console.log('Auth state changed:', { firebaseUser });
       if (firebaseUser) {
-        // Set auth cookie when user is authenticated
-        Cookies.set('auth', 'true', { expires: 7 });
         try {
           const userDoc = await getDoc(doc(db, 'studios', firebaseUser.uid));
           console.log('Fetched user doc:', { exists: userDoc.exists(), data: userDoc.data() });
+          
           if (userDoc.exists()) {
+            // Studio document exists - set user state and auth cookie
             const userData = userDoc.data() as Studio;
             console.log('Setting user state with:', userData);
+            Cookies.set('auth', 'true', { expires: 7 });
             setState({
               user: {
                 ...userData,
@@ -58,15 +59,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               error: null
             });
           } else {
+            // No studio document - sign out and redirect to sign-up
             console.log('No studio document found for user');
-            setState({ user: null, loading: false, error: 'No studio document found' });
+            await firebaseSignOut(auth);
+            Cookies.remove('auth');
+            setState({ 
+              user: null, 
+              loading: false, 
+              error: 'Studio not found. Please complete sign-up.' 
+            });
+            window.location.href = '/sign-up';
           }
         } catch (error) {
           console.error('Error fetching user data:', error);
-          setState({ user: null, loading: false, error: 'Failed to fetch user data' });
+          await firebaseSignOut(auth);
+          Cookies.remove('auth');
+          setState({ 
+            user: null, 
+            loading: false, 
+            error: 'Failed to fetch user data. Please try again.' 
+          });
+          window.location.href = '/sign-in';
         }
       } else {
-        // Remove auth cookie when user is not authenticated
+        // No Firebase user - clear everything
         Cookies.remove('auth');
         setState({ user: null, loading: false, error: null });
       }
