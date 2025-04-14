@@ -105,36 +105,38 @@ export function PricingPlans() {
 
   return (
     <div>
-      {/* Payment method toggle */}
-      <div className="payment-toggle">
-        <button
-          className={`btn ${paymentMethod === 'fiat' ? 'btn-primary' : 'btn-outline'}`}
-          onClick={() => setPaymentMethod('fiat')}
-        >
-          Credit Card
-        </button>
-        <button
-          className={`btn ${paymentMethod === 'crypto' ? 'btn-primary' : 'btn-outline'}`}
-          onClick={() => setPaymentMethod('crypto')}
-        >
-          Cryptocurrency
-        </button>
-      </div>
+      <div className="toggle-container">
+        {/* Payment method toggle */}
+        <div className="toggle-group">
+          <button
+            className={`toggle-button ${paymentMethod === 'fiat' ? 'active' : ''}`}
+            onClick={() => setPaymentMethod('fiat')}
+          >
+            Credit Card
+          </button>
+          <button
+            className={`toggle-button ${paymentMethod === 'crypto' ? 'active' : ''}`}
+            onClick={() => setPaymentMethod('crypto')}
+          >
+            Cryptocurrency
+          </button>
+        </div>
 
-      {/* Billing cycle toggle */}
-      <div className="billing-toggle">
-        <button
-          className={`btn ${billingCycle === 'monthly' ? 'btn-primary' : 'btn-outline'}`}
-          onClick={() => setBillingCycle('monthly')}
-        >
-          Monthly
-        </button>
-        <button
-          className={`btn ${billingCycle === 'yearly' ? 'btn-primary' : 'btn-outline'}`}
-          onClick={() => setBillingCycle('yearly')}
-        >
-          Yearly (Save 20%)
-        </button>
+        {/* Billing cycle toggle */}
+        <div className="toggle-group">
+          <button
+            className={`toggle-button ${billingCycle === 'monthly' ? 'active' : ''}`}
+            onClick={() => setBillingCycle('monthly')}
+          >
+            Monthly
+          </button>
+          <button
+            className={`toggle-button ${billingCycle === 'yearly' ? 'active' : ''}`}
+            onClick={() => setBillingCycle('yearly')}
+          >
+            Yearly (Save 20%)
+          </button>
+        </div>
       </div>
 
       {/* Pricing cards */}
@@ -144,24 +146,21 @@ export function PricingPlans() {
             key={plan.name} 
             className={`pricing-card ${plan.name === 'Studio' ? 'popular' : ''}`}
           >
-            {plan.name === 'Studio' && <div className="popular-badge">Most Popular</div>}
-            <div className="pricing-header">
-              <h3 className="pricing-title">{plan.name}</h3>
-              <p className="pricing-description">{plan.description}</p>
-              <div className="pricing-amount">
-                <span className="amount">
-                  ${billingCycle === 'yearly' ? Math.floor(plan.price * 0.8) : plan.price}
-                </span>
-                <span className="period">/month</span>
-              </div>
+            <div className="pricing-amount">
+              <span className="amount">
+                ${billingCycle === 'yearly' ? Math.floor(plan.price * 0.8) : plan.price}
+              </span>
+              <span className="period">/month</span>
             </div>
+            <h3 className="pricing-title">{plan.name}</h3>
+            <p className="pricing-description">{plan.description}</p>
             <ul className="pricing-features">
               {plan.features.map((feature) => (
                 <li key={feature}>{feature}</li>
               ))}
             </ul>
             <button
-              className="btn btn-primary"
+              className={`btn ${plan.name === 'Studio' ? 'btn-primary' : 'btn-outline'}`}
               onClick={() => handleSubscribe(plan)}
               disabled={isLoading}
             >
