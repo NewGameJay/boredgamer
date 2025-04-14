@@ -32,14 +32,8 @@ export default function SignUp() {
         studioName
       });
       
-      // Wait a moment for Firebase to complete the write
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      if (user) {
-        router.push('/subscription');
-      } else {
-        setError('Studio creation failed. Please try again.');
-      }
+      // If we get here, sign-up was successful
+      router.push('/subscription');
     } catch (err) {
       setError('Error creating account. Please try again.');
     } finally {
@@ -59,14 +53,8 @@ export default function SignUp() {
     try {
       await signInWithGoogle();
       
-      // Wait a moment for Firebase to complete the write
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      if (user) {
-        router.push('/subscription');
-      } else {
-        setError('Studio creation failed. Please try again.');
-      }
+      // If we get here, sign-in was successful
+      router.push('/subscription');
     } catch (err) {
       setError('Failed to sign in with Google');
     } finally {
