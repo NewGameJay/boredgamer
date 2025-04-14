@@ -6,7 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import '@/app/dashboard.css';
 
-const navigation = [
+const allNavigation = [
   { 
     name: 'Overview', 
     href: '/dashboard',
@@ -104,23 +104,43 @@ export default function DashboardLayout({
         </div>
 
         <nav className="sidebar-nav">
-          {navigation.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`nav-item ${isActive ? 'active' : ''}`}
-              >
-                {item.icon}
-                <span>{item.name}</span>
-              </Link>
-            );
-          })}
+          {allNavigation
+            .filter(item => {
+              const tier = user?.tier || 'independent';
+              
+              // Overview is always visible
+              if (item.name === 'Overview') return true;
+              
+              // Independent tier: only leaderboards and tournaments
+              if (tier === 'independent') {
+                return ['Leaderboards', 'Tournaments'].includes(item.name);
+              }
+              
+              // Studio tier: leaderboards, tournaments, quests, communities
+              if (tier === 'studio') {
+                return ['Leaderboards', 'Tournaments', 'Quests & Challenges', 'Communities'].includes(item.name);
+              }
+              
+              // Publisher and ecosystem tiers: access to everything
+              return ['ecosystem', 'publisher'].includes(tier);
+            })
+            .map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={`nav-item ${isActive ? 'active' : ''}`}
+                >
+                  {item.icon}
+                  <span>{item.name}</span>
+                </Link>
+              );
+            })}
         </nav>
 
         <div className="sidebar-footer">
-          <div className="user-profile">
+          <div className="user-profile" onClick={() => router.push('/account')}>
             <div className="user-name">{user?.name}</div>
             <div className="user-email">{user?.email}</div>
           </div>

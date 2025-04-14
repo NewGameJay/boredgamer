@@ -6,3 +6,38 @@
     margin: 0 .5rem;
 }
 
+.communities-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: white;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+}
+
+.communities-table thead {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.communities-table th {
+    padding: 1rem;
+    font-weight: 600;
+    text-align: left;
+    color: #4b5563;
+}
+
+.communities-table td {
+    padding: 1rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.communities-table tbody tr:hover {
+    background-color: #f8f9fa;
+    transition: all 0.2s ease;
+}
+
+.communities-table tbody tr:last-child td {
+    border-bottom: none;
+}

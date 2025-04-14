@@ -12,9 +12,20 @@ service cloud.firestore {
       return isAuthenticated() && exists(/databases/$(database)/documents/studios/$(request.auth.uid));
     }
 
+    // Users collection rules
+    match /users/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && request.auth.uid == userId &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['name', 'updatedAt']);
+    }
+
     // Studios collection rules
     match /studios/{studioId} {
       allow read: if isAuthenticated() && request.auth.uid == studioId;
+      allow update: if isAuthenticated() && request.auth.uid == studioId &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['name', 'updatedAt']);
     }
 
     // Leaderboards collection rules
@@ -39,6 +50,27 @@ service cloud.firestore {
       allow create, update: if isValidStudio() && 
         request.resource.data.studioId == request.auth.uid;
       allow delete: if isValidStudio() && 
+        resource.data.studioId == request.auth.uid;
+    }
+
+    // Communities collection rules
+    match /communities/{communityId} {
+      // Allow reading if authenticated and the community belongs to their studio
+      allow read: if isAuthenticated() && 
+        (resource == null || resource.data.studioId == request.auth.uid);
+      
+      // Allow creating if user is authenticated and sets their ID as studioId
+      allow create: if isAuthenticated() && 
+        request.resource.data.studioId == request.auth.uid &&
+        request.resource.data.keys().hasAll(['name', 'description', 'type', 'referee', 'platform', 'rewards', 'referralGame', 'referralSlug', 'referralDestination', 'createdAt']);
+      
+      // Allow updates if user owns the community
+      allow update: if isAuthenticated() && 
+        resource.data.studioId == request.auth.uid && 
+        request.resource.data.studioId == request.auth.uid;
+      
+      // Allow deletion if user owns the community
+      allow delete: if isAuthenticated() && 
         resource.data.studioId == request.auth.uid;
     }
 

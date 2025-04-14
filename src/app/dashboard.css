@@ -92,6 +92,11 @@
   margin-bottom: 1rem;
 }
 
+.user-profile:hover{
+  cursor: pointer;
+  background: var(--gradient-button);
+}
+
 .user-name {
   font-size: 0.875rem;
   font-weight: 600;
@@ -591,10 +596,4 @@ input[type="checkbox"]:checked {
 
 .requiredButton{
  border-radius: 0.375rem;
-}
-
-.quest-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.2);
-  cursor: pointer;
 }

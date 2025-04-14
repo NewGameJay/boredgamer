@@ -1,9 +1,14 @@
+import { Timestamp } from 'firebase/firestore';
+
 export interface Studio {
   id: string;
   studioId: string;  // Added for compatibility
   name: string;
   email: string;
   tier: 'independent' | 'studio' | 'ecosystem';
+  subscriptionStatus: 'trial' | 'active' | 'inactive' | 'cancelled';
+  trialEndsAt?: Timestamp;
+  currentPeriodEnd?: Timestamp;
   features: {
     leaderboards: boolean;
     quests: boolean;
@@ -13,8 +18,8 @@ export interface Studio {
     communities?: boolean;
     affiliates?: boolean;
   };
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 }
 
 export interface AuthState {

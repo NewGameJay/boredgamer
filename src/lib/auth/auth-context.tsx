@@ -10,7 +10,7 @@ import {
   GoogleAuthProvider,
   signInWithPopup
 } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, Timestamp } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import { AuthState, SignUpData, SignInData, Studio } from './types';
 import { app } from '@/lib/firebase';
 import Cookies from 'js-cookie';
@@ -75,6 +75,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
+  const checkSubscriptionStatus = async (userId: string) => {
+    try {
+      const studioDoc = await getDoc(doc(db, 'studios', userId));
+      if (studioDoc.exists()) {
+        const data = studioDoc.data();
+        return {
+          isActive: data.subscriptionStatus === 'active',
+          trialEndsAt: data.trialEndsAt?.toDate(),
+          currentPeriodEnd: data.currentPeriodEnd?.toDate()
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error checking subscription status:', error);
+      return null;
+    }
+  };
+
   const signUp = async ({ studioName, email, password }: SignUpData): Promise<void> => {
     try {
       setState({ user: null, loading: true, error: null });
@@ -86,6 +104,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: email,
         studioId: userId,  
         tier: 'independent' as const,
+        subscriptionStatus: 'trial' as const,
+        trialEndsAt: Timestamp.fromDate(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)),
         features: {
           leaderboards: true,
           quests: false,
@@ -95,8 +115,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           communities: false,
           affiliates: false
         },
-        createdAt: new Date(),
-        updatedAt: new Date()
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
       };
 
       await setDoc(doc(db, 'studios', userId), studioData);
@@ -131,6 +151,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: firebaseUser.email || '',
           studioId: firebaseUser.uid,
           tier: 'independent' as const,
+          subscriptionStatus: 'trial' as const,
+          trialEndsAt: Timestamp.fromDate(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)),
           features: {
             leaderboards: true,
             quests: false,
@@ -140,8 +162,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             communities: false,
             affiliates: false
           },
-          createdAt: new Date(),
-          updatedAt: new Date()
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now()
         };
         await setDoc(doc(db, 'studios', firebaseUser.uid), studioData);
         

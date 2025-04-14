@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -44,6 +44,15 @@ interface Community {
   visitCount: number;
   lastVisitedAt?: string;
   status: 'active' | 'archived';
+  referralGame: string;
+  referralSlug: string;
+  referralDestination: string;
+}
+
+interface Reward {
+  type: string;
+  amount: number;
+  metadata?: Record<string, any>;
 }
 
 interface FormData {
@@ -56,11 +65,7 @@ interface FormData {
   referralGame: string;
   referralSlug: string;
   referralDestination: string;
-  rewards: {
-    type: string;
-    amount: number;
-    metadata?: Record<string, any>;
-  }[];
+  rewards: Reward[];
 }
 
 export default function CommunityDashboard() {
@@ -85,31 +90,33 @@ export default function CommunityDashboard() {
   });
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (user) {
-      loadCommunities();
+  const loadCommunities = useCallback(async () => {
+    if (!user?.id || !user.features?.communities) {
+      console.log('No user ID available or no access to communities feature');
+      return;
     }
-  }, [user]);
-
-  const loadCommunities = async () => {
-    if (!user?.id) return;
 
     try {
+      console.log('Loading communities for user:', user.id);
       const q = query(
         collection(db, 'communities'),
         where('studioId', '==', user.id),
         orderBy('createdAt', 'desc')
       );
       const querySnapshot = await getDocs(q);
+      console.log('Query snapshot size:', querySnapshot.size);
       const communitiesData: Community[] = [];
-      
+
       querySnapshot.forEach((doc) => {
+        const data = doc.data() as Omit<Community, 'id'>;
+        console.log('Community data:', data);
         communitiesData.push({
           id: doc.id,
-          ...doc.data()
-        } as Community);
+          ...data,
+        });
       });
 
+      console.log('Setting communities:', communitiesData);
       setCommunities(communitiesData);
     } catch (error) {
       console.error('Error loading communities:', error);
@@ -119,26 +126,47 @@ export default function CommunityDashboard() {
         variant: "destructive",
       });
     }
-  };
+  }, [user?.id, toast]);
+
+  useEffect(() => {
+    console.log('Current user state:', {
+      id: user?.id,
+      features: user?.features,
+      hasCommunities: user?.features?.communities
+    });
+    if (user) {
+      loadCommunities();
+    }
+  }, [user, loadCommunities]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.id) return;
+
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to create a community.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     try {
-      const communityData = {
+      const communitiesRef = collection(db, 'communities');
+      const newCommunity = {
         ...formData,
         studioId: user.id,
         createdAt: new Date().toISOString(),
         memberCount: 0,
-        status: 'active'
+        visitCount: 0,
+        status: 'active' as const
       };
 
-      await addDoc(collection(db, 'communities'), communityData);
-      
+      await addDoc(communitiesRef, newCommunity);
+
       toast({
         title: "Success",
-        description: "Community created successfully",
+        description: "Community created successfully!",
       });
 
       setFormData({
@@ -394,29 +422,51 @@ export default function CommunityDashboard() {
               <CardDescription>View and manage your game communities</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
+              <Table className="communities-table">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Type</TableHead>
-                    <TableHead>Members</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Referee</TableHead>
+                    <TableHead>Platform</TableHead>
+                    <TableHead>Visits</TableHead>
+                    <TableHead>Referral Link</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {communities.map((community) => (
                     <TableRow key={community.id}>
-                      <TableCell>{community.name}</TableCell>
-                      <TableCell className="capitalize">{community.type}</TableCell>
-                      <TableCell>{community.memberCount}</TableCell>
-                      <TableCell>{format(new Date(community.createdAt), 'MMM d, yyyy')}</TableCell>
-                      <TableCell className="capitalize">{community.status}</TableCell>
+                      <TableCell className="font-medium">{community.name}</TableCell>
+                      <TableCell>{community.type}</TableCell>
+                      <TableCell>{community.referee}</TableCell>
+                      <TableCell>{community.platform}</TableCell>
+                      <TableCell>{community.visitCount || 0}</TableCell>
                       <TableCell>
-                        <div className="flex space-x-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">
+                            ng.games/{community.referralGame}/{community.referralSlug}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              navigator.clipboard.writeText(`ng.games/${community.referralGame}/${community.referralSlug}`);
+                              toast({
+                                title: "Copied!",
+                                description: "Link copied to clipboard",
+                              });
+                            }}
+                          >
+                            Copy
+                          </Button>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
                           <Button
                             variant="outline"
+                            size="sm"
                             onClick={() => {
                               setSelectedCommunity(community);
                               setIsEditingDetails(true);
@@ -426,6 +476,7 @@ export default function CommunityDashboard() {
                           </Button>
                           <Button
                             variant="destructive"
+                            size="sm"
                             onClick={() => {
                               setSelectedCommunity(community);
                               setIsConfirmingDelete(true);
