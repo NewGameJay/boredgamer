@@ -36,7 +36,7 @@ export default function SignUp() {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       if (user) {
-        router.push('/dashboard');
+        router.push('/subscription');
       } else {
         setError('Studio creation failed. Please try again.');
       }
@@ -63,7 +63,7 @@ export default function SignUp() {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       if (user) {
-        router.push('/dashboard');
+        router.push('/subscription');
       } else {
         setError('Studio creation failed. Please try again.');
       }

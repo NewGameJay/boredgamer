@@ -17,7 +17,7 @@ import {
 const plans = [
   {
     name: 'Independent',
-    price: 29,
+    price: 99,
     description: 'Perfect for indie game developers',
     features: [
       'Leaderboards',
@@ -29,7 +29,7 @@ const plans = [
   },
   {
     name: 'Studio',
-    price: 99,
+    price: 249,
     description: 'For growing game studios',
     features: [
       'Everything in Independent',
@@ -42,14 +42,27 @@ const plans = [
   },
   {
     name: 'Publisher',
-    price: 299,
-    description: 'For game publishers and ecosystems',
+    price: 499,
+    description: 'For game publishers',
     features: [
       'Everything in Studio',
       'Affiliates Program',
       'White-label Solution',
       'Dedicated Account Manager',
       'Custom Integration Support',
+    ],
+    tier: 'publisher'
+  },
+  {
+    name: 'Ecosystem',
+    price: 999,
+    description: 'For game ecosystems and platforms',
+    features: [
+      'Everything in Publisher',
+      'Custom Features',
+      'Enterprise Support',
+      'Custom Integrations',
+      'Dedicated Success Team',
     ],
     tier: 'ecosystem'
   }
@@ -126,7 +139,7 @@ export function PricingPlans() {
       </div>
 
       {/* Pricing cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto px-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto px-4">
         {plans.map((plan) => (
           <Card key={plan.name} className={`flex flex-col ${plan.name === 'Studio' ? 'border-primary' : ''}`}>
             <CardHeader>
