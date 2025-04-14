@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 
 export default function SignUp() {
   const router = useRouter();
-  const { signUp, signInWithGoogle } = useAuth();
+  const { signUp, signInWithGoogle, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [studioName, setStudioName] = useState('');
@@ -31,7 +31,15 @@ export default function SignUp() {
         password,
         studioName
       });
-      router.push('/');
+      
+      // Wait a moment for Firebase to complete the write
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      if (user) {
+        router.push('/dashboard');
+      } else {
+        setError('Studio creation failed. Please try again.');
+      }
     } catch (err) {
       setError('Error creating account. Please try again.');
     } finally {
@@ -50,7 +58,15 @@ export default function SignUp() {
     
     try {
       await signInWithGoogle();
-      router.push('/');
+      
+      // Wait a moment for Firebase to complete the write
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      if (user) {
+        router.push('/dashboard');
+      } else {
+        setError('Studio creation failed. Please try again.');
+      }
     } catch (err) {
       setError('Failed to sign in with Google');
     } finally {
