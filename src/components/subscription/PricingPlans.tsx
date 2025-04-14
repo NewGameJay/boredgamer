@@ -93,7 +93,6 @@ export function PricingPlans() {
       }
     } catch (error) {
       console.error('Error starting subscription:', error);
-      // Show error toast
       toast({
         title: 'Error',
         description: 'Failed to start subscription. Please try again.',
@@ -105,84 +104,71 @@ export function PricingPlans() {
   };
 
   return (
-    <div className="py-8">
+    <div>
       {/* Payment method toggle */}
-      <div className="flex justify-center gap-4 mb-4">
-        <Button
-          variant={paymentMethod === 'fiat' ? 'default' : 'outline'}
+      <div className="payment-toggle">
+        <button
+          className={`btn ${paymentMethod === 'fiat' ? 'btn-primary' : 'btn-outline'}`}
           onClick={() => setPaymentMethod('fiat')}
         >
           Credit Card
-        </Button>
-        <Button
-          variant={paymentMethod === 'crypto' ? 'default' : 'outline'}
+        </button>
+        <button
+          className={`btn ${paymentMethod === 'crypto' ? 'btn-primary' : 'btn-outline'}`}
           onClick={() => setPaymentMethod('crypto')}
         >
           Cryptocurrency
-        </Button>
+        </button>
       </div>
 
       {/* Billing cycle toggle */}
-      <div className="flex justify-center gap-4 mb-8">
-        <Button
-          variant={billingCycle === 'monthly' ? 'default' : 'outline'}
+      <div className="billing-toggle">
+        <button
+          className={`btn ${billingCycle === 'monthly' ? 'btn-primary' : 'btn-outline'}`}
           onClick={() => setBillingCycle('monthly')}
         >
           Monthly
-        </Button>
-        <Button
-          variant={billingCycle === 'yearly' ? 'default' : 'outline'}
+        </button>
+        <button
+          className={`btn ${billingCycle === 'yearly' ? 'btn-primary' : 'btn-outline'}`}
           onClick={() => setBillingCycle('yearly')}
         >
           Yearly (Save 20%)
-        </Button>
+        </button>
       </div>
 
       {/* Pricing cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto px-4">
+      <div className="pricing-grid">
         {plans.map((plan) => (
-          <Card key={plan.name} className={`flex flex-col ${plan.name === 'Studio' ? 'border-primary' : ''}`}>
-            <CardHeader>
-              <CardTitle>{plan.name}</CardTitle>
-              <CardDescription>{plan.description}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex-grow">
-              <div className="mb-4">
-                <span className="text-4xl font-bold">
+          <div 
+            key={plan.name} 
+            className={`pricing-card ${plan.name === 'Studio' ? 'popular' : ''}`}
+          >
+            {plan.name === 'Studio' && <div className="popular-badge">Most Popular</div>}
+            <div className="pricing-header">
+              <h3 className="pricing-title">{plan.name}</h3>
+              <p className="pricing-description">{plan.description}</p>
+              <div className="pricing-amount">
+                <span className="amount">
                   ${billingCycle === 'yearly' ? Math.floor(plan.price * 0.8) : plan.price}
                 </span>
-                <span className="text-muted-foreground">/month</span>
+                <span className="period">/month</span>
               </div>
-              <ul className="space-y-2">
-                {plan.features.map((feature) => (
-                  <li key={feature} className="flex items-center gap-2">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      className="w-5 h-5 text-green-500"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-            <CardFooter>
-              <Button
-                className="w-full"
-                variant={plan.name === 'Studio' ? 'default' : 'outline'}
-                onClick={() => handleSubscribe(plan)}
-              >
-                {user?.tier === plan.tier ? 'Current Plan' : 'Start Free Trial'}
-              </Button>
-            </CardFooter>
-          </Card>
+            </div>
+            <ul className="pricing-features">
+              {plan.features.map((feature) => (
+                <li key={feature}>{feature}</li>
+              ))}
+            </ul>
+            <button
+              className="btn btn-primary"
+              onClick={() => handleSubscribe(plan)}
+              disabled={isLoading}
+            >
+              {isLoading ? 'Processing...' : 
+                user?.tier === plan.tier ? 'Current Plan' : 'Start 14-day free trial'}
+            </button>
+          </div>
         ))}
       </div>
     </div>

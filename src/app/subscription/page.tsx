@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useRouter } from 'next/navigation';
 import { PricingPlans } from '@/components/subscription/PricingPlans';
+import './subscription.css';
 
 export default function SubscriptionPage() {
   const { user, loading } = useAuth();
