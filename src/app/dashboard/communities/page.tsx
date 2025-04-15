@@ -2,6 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  AnalyticsLineChart,
+  AnalyticsPieChartLinks,
+  AnalyticsPieChartCommunity,
+  AnalyticsPieChartReferee,
+  AnalyticsBarChartReferrer
+} from './analytics-charts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -137,6 +144,11 @@ export default function CommunityDashboard() {
     if (user) {
       loadCommunities();
     }
+
+    // Additional log: Check communities with studioId related to user after load
+    // This will require another effect to watch communities
+    // (add below, outside this effect)
+
   }, [user, loadCommunities]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -231,6 +243,14 @@ export default function CommunityDashboard() {
     }
   };
 
+  // Log communities with studioId matching user after communities load
+  useEffect(() => {
+    if (user?.id && communities.length > 0) {
+      const userCommunities = communities.filter(c => c.studioId === user.id);
+      console.log('[Communities Feature] Loaded communities with studioId matching user:', userCommunities);
+    }
+  }, [user?.id, communities]);
+
   return (
     <div className="container mx-auto py-10">
       <h1 className="text-4xl font-bold mb-8">Community Dashboard</h1>
@@ -238,7 +258,7 @@ export default function CommunityDashboard() {
         <TabsList>
           <TabsTrigger value="create">Create Community</TabsTrigger>
           <TabsTrigger value="manage">Manage Communities</TabsTrigger>
-          <TabsTrigger value="setup">Component Plugin</TabsTrigger>
+          <TabsTrigger value="setup">Live Analytics</TabsTrigger>
         </TabsList>
 
         <TabsContent value="create">
@@ -444,22 +464,27 @@ export default function CommunityDashboard() {
                       <TableCell>{community.visitCount || 0}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground">
-                            ng.games/{community.referralGame}/{community.referralSlug}
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              navigator.clipboard.writeText(`ng.games/${community.referralGame}/${community.referralSlug}`);
-                              toast({
-                                title: "Copied!",
-                                description: "Link copied to clipboard",
-                              });
-                            }}
-                          >
-                            Copy
-                          </Button>
+                          <a
+  className="text-sm text-blue-600 underline hover:text-blue-800 cursor-pointer"
+  href={`https://ng.games/${community.referralGame}/${community.referralSlug}`}
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  ng.games/{community.referralGame}/{community.referralSlug}
+</a>
+<Button
+  variant="ghost"
+  size="sm"
+  onClick={() => {
+    navigator.clipboard.writeText(`https://ng.games/${community.referralGame}/${community.referralSlug}`);
+    toast({
+      title: "Copied!",
+      description: "Link copied to clipboard",
+    });
+  }}
+>
+  Copy
+</Button>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -495,58 +520,43 @@ export default function CommunityDashboard() {
         </TabsContent>
 
         <TabsContent value="setup">
-          <Card>
-            <CardHeader>
-              <CardTitle>Community Component Plugin</CardTitle>
-              <CardDescription>Add community functionality to your game</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="rounded-md bg-muted p-4">
-                  <h3 className="mb-2 text-sm font-medium">Installation</h3>
-                  <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm">
-                    npm install @boredgamer/communities
-                  </code>
-                </div>
+  <Card>
+    <CardHeader>
+      <CardTitle>Live Analytics</CardTitle>
+      <CardDescription>Track community referral link performance in real time</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <div className="space-y-8">
+        {/* Line Chart: Total Clicks Over Time (Simulated as visitCount for now) */}
+        <div className="rounded-md bg-muted p-4">
+          <h3 className="mb-2 text-sm font-medium">Total Clicks (All Links)</h3>
+          <AnalyticsLineChart communities={communities} />
+        </div>
+        {/* Pie Chart: Most Clicked Links */}
+        <div className="rounded-md bg-muted p-4">
+          <h3 className="mb-2 text-sm font-medium">Most Clicked Links</h3>
+          <AnalyticsPieChartLinks communities={communities} />
+        </div>
+        {/* Pie Chart: By Community Name */}
+        <div className="rounded-md bg-muted p-4">
+          <h3 className="mb-2 text-sm font-medium">Clicks by Community</h3>
+          <AnalyticsPieChartCommunity communities={communities} />
+        </div>
+        {/* Pie Chart: By Referee */}
+        <div className="rounded-md bg-muted p-4">
+          <h3 className="mb-2 text-sm font-medium">Clicks by Referee</h3>
+          <AnalyticsPieChartReferee communities={communities} />
+        </div>
+        {/* Bar Chart: By Referrer (Placeholder, needs backend tracking) */}
+        <div className="rounded-md bg-muted p-4">
+          <h3 className="mb-2 text-sm font-medium">Clicks by Referrer</h3>
+          <AnalyticsBarChartReferrer />
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+</TabsContent>
 
-                <div className="rounded-md bg-muted p-4">
-                  <h3 className="mb-2 text-sm font-medium">Usage</h3>
-                  <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm">
-                    import &#123; CommunityManager &#125; from &apos;@boredgamer/communities&apos;;
-                  </code>
-                </div>
-
-                <div className="rounded-md bg-muted p-4">
-                  <h3 className="mb-2 text-sm font-medium">Example</h3>
-                  <pre className="text-sm">
-                    <code>
-                      {`const community = new CommunityManager({
-  apiKey: 'your-api-key',
-  gameId: 'your-game-id'
-});
-
-// Get community details
-const communityDetails = await community.get('community-id');
-
-// Join community
-await community.join({
-  communityId: 'community-id',
-  userId: 'user-id'
-});
-
-// Post to community
-await community.createPost({
-  communityId: 'community-id',
-  userId: 'user-id',
-  content: 'Hello community!'
-});`}
-                    </code>
-                  </pre>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
       <Dialog open={isEditingDetails} onOpenChange={setIsEditingDetails}>
