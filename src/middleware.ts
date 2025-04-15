@@ -50,6 +50,6 @@ export const config = {
     '/dashboard/:path*',
     '/sign-in',
     '/sign-up',
-    '/:referralGame/:referralSlug',
+    '/:game/:referralSlug',
   ],
 };

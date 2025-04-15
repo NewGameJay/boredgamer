@@ -4,16 +4,16 @@ import { collection, query, where, getDocs, doc, updateDoc, increment } from 'fi
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const referralGame = searchParams.get('referralGame');
+  const game = searchParams.get('game');
   const referralSlug = searchParams.get('referralSlug');
 
-  if (!referralGame || !referralSlug) {
+  if (!game || !referralSlug) {
     return NextResponse.json({ error: 'Missing params' }, { status: 400 });
   }
 
   const q = query(
     collection(db, 'communities'),
-    where('referralGame', '==', referralGame),
+    where('game', '==', game),
     where('referralSlug', '==', referralSlug)
   );
   const querySnapshot = await getDocs(q);
