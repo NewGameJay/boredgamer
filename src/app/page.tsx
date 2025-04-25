@@ -136,7 +136,7 @@ export default function Home() {
             <Link href="/" className="header-logo">boredgamer</Link>
             <nav className="header-nav">
               <Link href="#features" className="nav-link">Features</Link>
-              <Link href="/docs" className="nav-link">Documentation</Link>
+              <Link href="#docs" className="nav-link">Documentation</Link>
             </nav>
           </div>
           <div className="header-actions">
