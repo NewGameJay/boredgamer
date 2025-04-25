@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getFirestore, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
-import { app } from '@/lib/firebase';
+import { adminDb } from '@/lib/firebase-admin';
 
-export const runtime = 'edge';
-const db = getFirestore(app);
+export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
   // Handle CORS preflight
@@ -44,9 +42,8 @@ export async function POST(request: Request) {
 
     try {
       // Find studio by API key
-      const studiosRef = collection(db, 'studios');
-      const q = query(studiosRef, where('apiKey', '==', apiKey));
-      const querySnapshot = await getDocs(q);
+      const studiosRef = adminDb.collection('studios');
+      const querySnapshot = await studiosRef.where('apiKey', '==', apiKey).get();
 
       if (querySnapshot.empty) {
         const response = NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
@@ -86,8 +83,8 @@ export async function POST(request: Request) {
       };
 
       // Add event to Firestore
-      const eventsRef = collection(db, 'events');
-      const docRef = await addDoc(eventsRef, event);
+      const eventsRef = adminDb.collection('events');
+      const docRef = await eventsRef.add(event);
 
       const response = NextResponse.json({ 
         success: true, 
