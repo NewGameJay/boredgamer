@@ -137,7 +137,6 @@ export default function Home() {
             <nav className="header-nav">
               <Link href="#features" className="nav-link">Features</Link>
               <Link href="#docs" className="nav-link">Documentation</Link>
-              <Link href="#pricing" className="nav-link">Pricing</Link>
             </nav>
           </div>
           <div className="header-actions">

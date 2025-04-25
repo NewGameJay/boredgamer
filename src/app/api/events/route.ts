@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
+import { getFirestore, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
+import { app } from '@/lib/firebase';
 
 export const runtime = 'edge';
+const db = getFirestore(app);
 
 export async function POST(request: Request) {
   try {
@@ -22,55 +25,51 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create event document
-    const event = {
-      gameId,
-      type,
-      data,
-      timestamp: new Date().toISOString(),
-      metadata: {
-        sdkVersion: '1.0.0',
-        apiVersion: 'v1'
-      }
-    };
-
     try {
-      // Send directly to Firestore REST API
-      const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-      const response = await fetch(
-        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/events`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            fields: {
-              gameId: { stringValue: event.gameId },
-              type: { stringValue: event.type },
-              data: { mapValue: { fields: convertToFirestoreFields(event.data) } },
-              timestamp: { timestampValue: event.timestamp },
-              metadata: { mapValue: { fields: convertToFirestoreFields(event.metadata) } }
-            }
-          })
-        }
-      );
+      // Find studio by API key
+      const studiosRef = collection(db, 'studios');
+      const q = query(studiosRef, where('apiKey', '==', apiKey));
+      const querySnapshot = await getDocs(q);
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error?.message || 'Failed to save event');
+      if (querySnapshot.empty) {
+        return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
       }
 
-      const result = await response.json();
-      const docId = result.name.split('/').pop();
+      const studio = querySnapshot.docs[0];
+      const studioData = studio.data();
+
+      // Verify game ID belongs to this studio
+      if (studioData.gameId !== gameId) {
+        return NextResponse.json(
+          { error: 'Game ID does not match studio' },
+          { status: 403 }
+        );
+      }
+
+      // Create event document
+      const event = {
+        gameId,
+        studioId: studio.id,
+        type,
+        data,
+        timestamp: new Date(),
+        metadata: {
+          sdkVersion: '1.0.0',
+          apiVersion: 'v1',
+          platform: body.platform || 'unknown'
+        }
+      };
+
+      // Add event to Firestore
+      const eventsRef = collection(db, 'events');
+      const docRef = await addDoc(eventsRef, event);
 
       return NextResponse.json({ 
         success: true, 
         event: { 
           type, 
           gameId,
-          id: docId
+          id: docRef.id
         } 
       });
     } catch (error: any) {

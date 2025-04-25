@@ -25,10 +25,7 @@ export default function SignIn() {
       });
       console.log('🔑 Successfully signed in with email:', email);
       
-      // Wait a bit for the auth state to be set
-      setTimeout(() => {
-        router.push('/dashboard');
-      }, 1000);
+      router.push('/dashboard');
     } catch (err) {
       setError('Invalid email or password');
       setIsLoading(false);
@@ -43,10 +40,7 @@ export default function SignIn() {
       await signInWithGoogle();
       console.log('🔑 Successfully signed in with Google');
       
-      // Wait a bit for the auth state to be set
-      setTimeout(() => {
-        router.push('/dashboard');
-      }, 1000);
+      router.push('/dashboard');
     } catch (err) {
       setError('Failed to sign in with Google');
       setIsLoading(false);

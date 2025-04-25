@@ -2,12 +2,7 @@
 const nextConfig = {
   // Domain configuration
   async rewrites() {
-    return [
-      {
-        source: '/:game/:community',
-        destination: '/[game]/[community]',
-      },
-    ];
+    return [];
   },
   reactStrictMode: true,
   swcMinify: true,

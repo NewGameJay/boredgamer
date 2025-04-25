@@ -119,17 +119,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: studioName,
         email: email,
         studioId: userId,  
-        tier: 'independent' as const,
-        subscriptionStatus: 'trial' as const,
-        trialEndsAt: Timestamp.fromDate(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)),
+        tier: 'ecosystem' as const,
+        subscriptionStatus: 'active' as const,
         features: {
           leaderboards: true,
-          quests: false,
-          tournaments: false,
-          matchmaking: false,
-          creatorProgram: false,
-          communities: false,
-          affiliates: false
+          quests: true,
+          tournaments: true,
+          matchmaking: true,
+          creatorProgram: true,
+          communities: true,
+          affiliates: true
         },
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
@@ -166,17 +165,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           name: studioName,
           email: firebaseUser.email || '',
           studioId: firebaseUser.uid,
-          tier: 'independent' as const,
-          subscriptionStatus: 'trial' as const,
-          trialEndsAt: Timestamp.fromDate(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)),
+          tier: 'ecosystem' as const,
+          subscriptionStatus: 'active' as const,
           features: {
             leaderboards: true,
-            quests: false,
-            tournaments: false,
-            matchmaking: false,
-            creatorProgram: false,
-            communities: false,
-            affiliates: false
+            quests: true,
+            tournaments: true,
+            matchmaking: true,
+            creatorProgram: true,
+            communities: true,
+            affiliates: true
           },
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now()

@@ -1,6 +1,6 @@
 import { Redis } from 'ioredis';
 import { StorageAdapter, ScoreEntry, QueryOptions } from './types';
-import { TIER_LIMITS, SubscriptionTier } from '@/types/subscription';
+
 
 export class RedisStorageAdapter implements StorageAdapter {
   private redis: Redis;
@@ -43,12 +43,9 @@ export class RedisStorageAdapter implements StorageAdapter {
     const leaderboardKey = this.getLeaderboardKey(gameId, category);
 
     // Get score IDs from sorted set
-    const scoreIds = await this.redis.zrange(
-      leaderboardKey,
-      offset,
-      offset + limit - 1,
-      sortOrder === 'desc' ? 'REV' : undefined
-    );
+    const scoreIds = sortOrder === 'desc'
+      ? await this.redis.zrevrange(leaderboardKey, offset, offset + limit - 1)
+      : await this.redis.zrange(leaderboardKey, offset, offset + limit - 1);
 
     if (scoreIds.length === 0) return [];
 
@@ -65,13 +62,19 @@ export class RedisStorageAdapter implements StorageAdapter {
     return results
       .map(([err, data]) => {
         if (err || !data) return null;
-        return {
-          ...data,
-          metadata: data.metadata ? JSON.parse(data.metadata) : undefined,
-          timestamp: new Date(data.timestamp),
-          score: Number(data.score),
-          verified: data.verified === 'true'
-        } as ScoreEntry;
+        const typedData = data as { id: string; gameId: string; playerId: string; playerName: string; metadata: string; timestamp: string; score: string; verified: string; category: string };
+        const parsedData: ScoreEntry = {
+          id: typedData.id,
+          gameId: typedData.gameId,
+          playerId: typedData.playerId,
+          playerName: typedData.playerName,
+          metadata: typedData.metadata ? JSON.parse(typedData.metadata) : {},
+          timestamp: new Date(typedData.timestamp),
+          score: Number(typedData.score),
+          verified: typedData.verified === 'true',
+          category: typedData.category
+        };
+        return parsedData;
       })
       .filter((score): score is ScoreEntry => score !== null);
   }

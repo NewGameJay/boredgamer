@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   const q = query(
     collection(db, 'communities'),
-    where('game', '==', game),
+    where('referralGame', '==', game),
     where('referralSlug', '==', referralSlug)
   );
   const querySnapshot = await getDocs(q);

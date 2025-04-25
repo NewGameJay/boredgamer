@@ -62,6 +62,13 @@ interface Reward {
   metadata?: Record<string, any>;
 }
 
+interface IdentifiedUser {
+  userId: string;
+  identifier: string;
+  timestamp: string;
+  referee: string;
+}
+
 interface FormData {
   name: string;
   description: string;
@@ -82,6 +89,8 @@ export default function CommunityDashboard() {
   const [selectedCommunity, setSelectedCommunity] = useState<Community | null>(null);
   const [isEditingDetails, setIsEditingDetails] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [isViewingIdentified, setIsViewingIdentified] = useState(false);
+  const [identifiedUsers, setIdentifiedUsers] = useState<IdentifiedUser[]>([]);
   const [activeTab, setActiveTab] = useState('create');
   const [formData, setFormData] = useState<FormData>({
     name: '',
@@ -224,6 +233,41 @@ export default function CommunityDashboard() {
     }
   };
 
+  const fetchIdentifiedUsers = async (communityId: string) => {
+    try {
+      const referralsRef = collection(db, 'referrals');
+      const q = query(
+        referralsRef,
+        where('communityId', '==', communityId),
+        where('identified', '==', true),
+        orderBy('identifiedAt', 'desc')
+      );
+
+      const querySnapshot = await getDocs(q);
+      const users: IdentifiedUser[] = [];
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        users.push({
+          userId: data.userId,
+          identifier: data.metadata?.username || data.userId,
+          timestamp: data.identifiedAt,
+          referee: data.referee || 'direct'
+        });
+      });
+
+      setIdentifiedUsers(users);
+      setIsViewingIdentified(true);
+    } catch (error) {
+      console.error('Error fetching identified users:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch identified users",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleDeleteCommunity = async (communityId: string) => {
     try {
       await deleteDoc(doc(db, 'communities', communityId));
@@ -258,7 +302,8 @@ export default function CommunityDashboard() {
         <TabsList>
           <TabsTrigger value="create">Create Community</TabsTrigger>
           <TabsTrigger value="manage">Manage Communities</TabsTrigger>
-          <TabsTrigger value="setup">Live Analytics</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="identification">Identification Setup</TabsTrigger>
         </TabsList>
 
         <TabsContent value="create">
@@ -494,10 +539,10 @@ export default function CommunityDashboard() {
                             size="sm"
                             onClick={() => {
                               setSelectedCommunity(community);
-                              setIsEditingDetails(true);
+                              fetchIdentifiedUsers(community.id);
                             }}
                           >
-                            Edit
+                            Manage
                           </Button>
                           <Button
                             variant="destructive"
@@ -519,7 +564,7 @@ export default function CommunityDashboard() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="setup">
+        <TabsContent value="analytics">
   <Card>
     <CardHeader>
       <CardTitle>Live Analytics</CardTitle>
@@ -556,6 +601,130 @@ export default function CommunityDashboard() {
     </CardContent>
   </Card>
 </TabsContent>
+
+        <TabsContent value="identification" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Identification Setup Guide</CardTitle>
+              <CardDescription>Follow these steps to implement user identification in your game</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-8">
+                {/* Step 1: Referral Token */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Step 1: Handle Referral Token</h3>
+                  <p className="text-sm text-muted-foreground">
+                    When users click your referral link (ng.games/game-name/community-name), they'll be redirected to your game with a referral token. The token will be included in the URL parameters. 
+                    The URL will look like this:
+                  </p>
+                  <div className="bg-muted p-4 rounded-md">
+                    <code className="text-sm">
+                      https://yourgame.com/register?referralToken=community-name
+                    </code>
+                  </div>
+                </div>
+
+                {/* Step 2: API Implementation */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Step 2: Implement API Endpoint</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Create an API endpoint in your game to receive the user identifier after successful registration/login.
+                    Send this data to our API:
+                  </p>
+                  <div className="bg-muted p-4 rounded-md space-y-4">
+                    <div>
+                      <p className="text-sm font-medium mb-2">Endpoint:</p>
+                      <code className="text-sm">
+                        POST https://api.boredgamer.com/v1/identify
+                      </code>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium mb-2">Request Body:</p>
+                      <pre className="text-sm">
+{`{
+  "referralToken": "xyz123",
+  "userId": "player_unique_id",
+  "gameId": "your_game_id",
+  "metadata": {
+    // Optional additional user data
+    "username": "player_username",
+    "joinedAt": "2025-04-21T20:05:23Z"
+  }
+}`}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 3: Code Example */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Step 3: Implementation Example</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Here's a code example showing how to implement the identification flow:
+                  </p>
+                  <div className="bg-muted p-4 rounded-md">
+                    <pre className="text-sm">
+{`// 1. Get referral token from URL
+const params = new URLSearchParams(window.location.search);
+const referralToken = params.get('referralToken');
+
+// 2. After user signs up/logs in, send identification
+async function identifyUser(userId, username) {
+  try {
+    const response = await fetch('https://api.boredgamer.com/v1/identify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer YOUR_API_KEY'
+      },
+      body: JSON.stringify({
+        referralToken,
+        userId,
+        gameId: 'your_game_id',
+        metadata: {
+          username,
+          joinedAt: new Date().toISOString()
+        }
+      })
+    });
+    
+    const data = await response.json();
+    console.log('User identified:', data);
+  } catch (error) {
+    console.error('Error identifying user:', error);
+  }
+}`}
+                    </pre>
+                  </div>
+                </div>
+
+                {/* Step 4: Testing */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Step 4: Testing</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Test your implementation using these steps:
+                  </p>
+                  <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
+                    <li>Create a test community and get a referral link</li>
+                    <li>Click the referral link to go to your game</li>
+                    <li>Sign up/log in a test user</li>
+                    <li>Verify the identification API call is made</li>
+                    <li>Check the Analytics tab to see if the conversion is tracked</li>
+                  </ol>
+                </div>
+
+                {/* Need Help Section */}
+                <div className="mt-8 p-4 bg-muted rounded-md">
+                  <h3 className="text-sm font-semibold mb-2">Need Help?</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Check out our <a href="/docs/api" className="text-primary hover:underline">API documentation</a> for 
+                    detailed information or contact our support team at support@boredgamer.gg
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
       </Tabs>
 
@@ -626,6 +795,50 @@ export default function CommunityDashboard() {
             >
               Delete
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isViewingIdentified} onOpenChange={setIsViewingIdentified}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Identified Users - {selectedCommunity?.name}</DialogTitle>
+            <DialogDescription>
+              Users who have been identified through this community's referral link
+            </DialogDescription>
+          </DialogHeader>
+          <div className="relative overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Identifier</TableHead>
+                  <TableHead>User ID</TableHead>
+                  <TableHead>Timestamp</TableHead>
+                  <TableHead>Referee</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {identifiedUsers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                      No identified users yet
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  identifiedUsers.map((user, index) => (
+                    <TableRow key={index}>
+                      <TableCell>{user.identifier}</TableCell>
+                      <TableCell className="font-mono text-xs">{user.userId}</TableCell>
+                      <TableCell>{new Date(user.timestamp).toLocaleString()}</TableCell>
+                      <TableCell>{user.referee}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsViewingIdentified(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

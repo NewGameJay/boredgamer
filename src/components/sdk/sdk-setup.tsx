@@ -47,9 +47,16 @@ export function SDKSetup() {
   const [filterType, setFilterType] = useState<'type' | 'gameId' | 'all'>('all');
 
   const filteredEvents = useMemo(() => {
-    if (!eventFilter) return eventLogs;
+    // If no game ID is set, show no events
+    if (!savedGameId) return [];
     
-    return eventLogs.filter(event => {
+    // First filter by game ID
+    const gameIdFiltered = eventLogs.filter(event => event.gameId === savedGameId);
+    
+    // Then apply search filter if one exists
+    if (!eventFilter) return gameIdFiltered;
+    
+    return gameIdFiltered.filter(event => {
       const searchTerm = eventFilter.toLowerCase();
       switch (filterType) {
         case 'type':
@@ -60,12 +67,11 @@ export function SDKSetup() {
         default:
           return (
             event.type.toLowerCase().includes(searchTerm) ||
-            event.gameId.toLowerCase().includes(searchTerm) ||
             JSON.stringify(event.data).toLowerCase().includes(searchTerm)
           );
       }
     });
-  }, [eventLogs, eventFilter, filterType]);
+  }, [eventLogs, eventFilter, filterType, savedGameId]);
 
   const toggleEventExpansion = (eventId: string) => {
     setExpandedEvents(prev => {
@@ -86,28 +92,43 @@ export function SDKSetup() {
   }, [user?.id]);
 
   useEffect(() => {
-    if (user?.id && apiKey && gameId) {
-      // Set up real-time event listener
-      const eventsRef = collection(db, 'events');
-      const q = query(
-        eventsRef,
-        where('gameId', '==', gameId),
-        orderBy('timestamp', 'desc'),
-        limit(100)
-      );
+    if (!user?.id) return;
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const newEvents = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          timestamp: doc.data().timestamp?.toDate()
-        }));
-        setEventLogs(newEvents);
-      });
+    // First get the user's game ID from their studio document
+    const fetchUserGameId = async () => {
+      const studioDoc = await getDoc(doc(db, 'studios', user.id));
+      if (studioDoc.exists()) {
+        const studioData = studioDoc.data();
+        setGameId(studioData.gameId || '');
+        setSavedGameId(studioData.gameId || '');
 
-      return () => unsubscribe();
-    }
-  }, [user?.id, apiKey, gameId]);
+        if (studioData.gameId) {
+          // Set up real-time event listener
+          const eventsRef = collection(db, 'events');
+          const q = query(
+            eventsRef,
+            where('studioId', '==', user.id),
+            where('gameId', '==', studioData.gameId),
+            orderBy('timestamp', 'desc'),
+            limit(100)
+          );
+
+          const unsubscribe = onSnapshot(q, (snapshot) => {
+            const newEvents = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data(),
+              timestamp: doc.data().timestamp?.toDate()
+            }));
+            setEventLogs(newEvents);
+          });
+
+          return () => unsubscribe();
+        }
+      }
+    };
+
+    fetchUserGameId();
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user) return;
@@ -787,7 +808,7 @@ export class GameAnalytics {
                       <div className="space-y-4">
                         <h4 className="font-medium">API Endpoint</h4>
                         <pre className="bg-slate-900 p-4 rounded-lg overflow-x-auto">
-                          <code className="text-sm text-slate-50">POST https://api.boredgamer.com/api/events</code>
+                          <code className="text-sm text-slate-50">POST /api/events</code>
                         </pre>
 
                         <h4 className="font-medium">Example Request</h4>
@@ -817,7 +838,7 @@ public class BoredgamerEvents : MonoBehaviour
 {
     private readonly string API_KEY = "your-api-key";
     private readonly string GAME_ID = "your-game-id";
-    private readonly string API_URL = "https://api.boredgamer.com/api/events";
+    private readonly string API_URL = "https://YOUR_DOMAIN/api/events";  // Replace YOUR_DOMAIN with your actual domain
     
     public void TrackEvent(string type, object data)
     {
@@ -866,7 +887,7 @@ public:
 private:
     const FString API_KEY = TEXT("your-api-key");
     const FString GAME_ID = TEXT("your-game-id");
-    const FString API_URL = TEXT("https://api.boredgamer.com/api/events");
+    const FString API_URL = TEXT("https://YOUR_DOMAIN/api/events");  // Replace YOUR_DOMAIN with your actual domain
 };
 
 // BoredgamerEvents.cpp
@@ -975,9 +996,13 @@ void UBoredgamerEvents::TrackEvent(const FString& Type, const TSharedPtr<FJsonOb
                 </div>
               </div>
               <div className="bg-slate-900 text-slate-50 p-4 rounded-lg h-[400px] overflow-y-auto font-mono text-sm">
-                {filteredEvents.length === 0 ? (
+                {!savedGameId ? (
                   <div className="text-slate-500">
-                    No events received yet. Start sending events from your game to see them here.
+                    Please set up your Game ID in the SDK Setup tab to view events.
+                  </div>
+                ) : filteredEvents.length === 0 ? (
+                  <div className="text-slate-500">
+                    No events received yet for Game ID: {savedGameId}. Start sending events from your game to see them here.
                   </div>
                 ) : (
                   <table className="w-full border-collapse border border-slate-700 datatable">

@@ -1,13 +1,19 @@
 import { RedisStorageAdapter } from './redis-adapter';
 import { PostgresStorageAdapter } from './postgres-adapter';
 import { StorageAdapter, ScoreEntry, QueryOptions } from './types';
-import { TIER_LIMITS, SubscriptionTier } from '@/types/subscription';
+// Fixed limits for test mode
+const STORAGE_LIMITS = {
+  maxEntries: 1000000,
+  maxQueries: 10000,
+  maxBatchSize: 1000,
+  retentionDays: 365  // Store data for up to a year
+};
 
 export class HybridStorageManager implements StorageAdapter {
   constructor(
     private redis: RedisStorageAdapter,
     private postgres: PostgresStorageAdapter,
-    private tier: SubscriptionTier
+    // All users have full access in test mode
   ) {}
 
   async saveScore(gameId: string, score: ScoreEntry): Promise<void> {
@@ -21,7 +27,7 @@ export class HybridStorageManager implements StorageAdapter {
   async getScores(gameId: string, options: QueryOptions): Promise<ScoreEntry[]> {
     const { startDate } = options;
     const now = new Date();
-    const retentionDays = TIER_LIMITS[this.tier].retentionDays;
+    const retentionDays = STORAGE_LIMITS.maxEntries;
     const retentionDate = new Date(now.getTime() - (retentionDays * 24 * 60 * 60 * 1000));
 
     // If requesting recent data (last 24 hours), get from Redis
@@ -85,7 +91,7 @@ export class HybridStorageManager implements StorageAdapter {
 
   async enforceRetention(gameId: string): Promise<void> {
     const now = new Date();
-    const retentionDays = TIER_LIMITS[this.tier].retentionDays;
+    const retentionDays = STORAGE_LIMITS.maxEntries;
     const cutoffDate = new Date(now.getTime() - (retentionDays * 24 * 60 * 60 * 1000));
 
     await this.cleanup(gameId, cutoffDate);

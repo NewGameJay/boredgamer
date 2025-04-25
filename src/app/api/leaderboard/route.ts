@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { HybridStorageManager } from '@/lib/storage/hybrid-storage';
 import { RedisStorageAdapter } from '@/lib/storage/redis-adapter';
 import { PostgresStorageAdapter } from '@/lib/storage/postgres-adapter';
-import { TIER_LIMITS } from '@/types/subscription';
+
 import { rateLimit } from '@/lib/rate-limit';
 
 // Initialize storage adapters
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     const tier = 'independent';
     
     // Check rate limit
-    const { success } = await rateLimit(apiKey, TIER_LIMITS[tier].requestsPerMinute);
+    const { success } = await rateLimit(apiKey, 100); // Fixed rate limit for all users
     if (!success) {
       return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
     }
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const storage = new HybridStorageManager(redis, postgres, tier);
+    const storage = new HybridStorageManager(redis, postgres);
     
     await storage.saveScore(gameId, {
       id: crypto.randomUUID(),
@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
     const tier = 'independent';
     
     // Check rate limit
-    const { success } = await rateLimit(apiKey, TIER_LIMITS[tier].requestsPerMinute);
+    const { success } = await rateLimit(apiKey, 100); // Replaced TIER_LIMITS[tier].requestsPerMinute with a fixed value
     if (!success) {
       return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
     }
@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Missing gameId' }, { status: 400 });
     }
 
-    const storage = new HybridStorageManager(redis, postgres, tier);
+    const storage = new HybridStorageManager(redis, postgres);
     
     const scores = await storage.getScores(gameId, {
       category,

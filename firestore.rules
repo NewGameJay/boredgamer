@@ -53,23 +53,89 @@ service cloud.firestore {
 
     // Communities collection rules
     match /communities/{communityId} {
-      // Allow reading if authenticated and the community belongs to their studio
-      allow read: if isAuthenticated() && 
-        (resource == null || resource.data.studioId == request.auth.uid);
+      // Allow anyone to read community data
+      allow get, list: if true;
+
+      // Allow anyone to increment visitCount and update lastVisitedAt only (public analytics)
+      allow update: if (
+        !isAuthenticated() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['visitCount', 'lastVisitedAt']) &&
+        request.resource.data.visitCount == resource.data.visitCount + 1
+      );
+
+      // Allow authenticated studio owner to create
+      allow create: if isAuthenticated() && 
+        request.resource.data.studioId == request.auth.uid &&
+        request.resource.data.keys().hasAll(['name', 'description', 'type', 'referee', 'platform', 'rewards', 'referralGame', 'referralSlug', 'referralDestination', 'createdAt']);
+
+      // Allow authenticated studio owner to update/delete
+      allow update, delete: if isAuthenticated() && 
+        resource.data.studioId == request.auth.uid && 
+        request.resource.data.studioId == request.auth.uid;
+    }
+
+    // Contracts collection rules - just stores addresses per network
+    match /contracts/{network} {
+      // Anyone can read contract addresses
+      allow read: if true;
+      
+      // Only admin can update contract addresses
+      allow write: if isAuthenticated() && 
+        get(/databases/$(database)/documents/studios/$(request.auth.uid)).data.role == 'admin' &&
+        request.resource.data.keys().hasAll(['address', 'chainId']);
+    }
+
+    // Affiliate codes collection rules
+    match /affiliateCodes/{codeId} {
+      // Allow reading if user owns the code
+      allow read: if isAuthenticated() &&
+        resource.data.studioId == request.auth.uid;
       
       // Allow creating if user is authenticated and sets their ID as studioId
       allow create: if isAuthenticated() && 
         request.resource.data.studioId == request.auth.uid &&
-        request.resource.data.keys().hasAll(['name', 'description', 'type', 'referee', 'platform', 'rewards', 'referralGame', 'referralSlug', 'referralDestination', 'createdAt']);
-      
-      // Allow updates if user owns the community
-      allow update: if isAuthenticated() && 
-        resource.data.studioId == request.auth.uid && 
+        request.resource.data.keys().hasAll(['name', 'code', 'type', 'platform', 'royaltyPercentage', 'createdAt', 'studioId']) &&
+        (
+          // For web3 type, require web3Config with network and payout address
+          request.resource.data.type == 'web3' ?
+            request.resource.data.web3Config != null &&
+            request.resource.data.web3Config.network is string &&
+            request.resource.data.web3Config.payoutAddress is string :
+            true
+        );
+
+      // Allow updating only specific fields
+      allow update: if isAuthenticated() &&
+        resource.data.studioId == request.auth.uid &&
         request.resource.data.studioId == request.auth.uid;
-      
-      // Allow deletion if user owns the community
-      allow delete: if isAuthenticated() && 
+
+      // Allow deletion if user owns the code
+      allow delete: if isAuthenticated() &&
         resource.data.studioId == request.auth.uid;
+    }
+
+    // Transactions collection rules
+    match /transactions/{transactionId} {
+      // Allow reading if user owns the related affiliate code
+      allow read: if isAuthenticated() &&
+        get(/databases/$(database)/documents/affiliateCodes/$(resource.data.affiliateCodeId)).data.studioId == request.auth.uid;
+      
+      // Allow creating if the request includes all required fields
+      allow create: if
+        request.resource.data.keys().hasAll(['affiliateCodeId', 'amount', 'royaltyAmount', 'timestamp', 'platform']) &&
+        get(/databases/$(database)/documents/affiliateCodes/$(request.resource.data.affiliateCodeId)).data.studioId == request.auth.uid;
+    }
+
+    // Referrals collection rules
+    match /referrals/{referralId} {
+      // Allow reading if user is authenticated and owns the related community
+      allow read: if isAuthenticated() &&
+        get(/databases/$(database)/documents/communities/$(resource.data.communityId)).data.studioId == request.auth.uid;
+      
+      // Allow creating/updating when identified is set to true (for API callbacks)
+      allow create, update: if
+        (!isAuthenticated() && request.resource.data.identified == true) ||
+        (isAuthenticated() && get(/databases/$(database)/documents/communities/$(request.resource.data.communityId)).data.studioId == request.auth.uid);
     }
 
     // Tournaments collection rules

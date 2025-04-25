@@ -33,7 +33,7 @@ export default function SignUp() {
       });
       
       // If we get here, sign-up was successful
-      router.push('/subscription');
+      router.push('/dashboard');
     } catch (err) {
       setError('Error creating account. Please try again.');
     } finally {
@@ -54,7 +54,7 @@ export default function SignUp() {
       await signInWithGoogle();
       
       // If we get here, sign-in was successful
-      router.push('/subscription');
+      router.push('/dashboard');
     } catch (err) {
       setError('Failed to sign in with Google');
     } finally {
