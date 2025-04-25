@@ -37,9 +37,15 @@ service cloud.firestore {
     // Events collection rules
     match /events/{eventId} {
       allow read: if isValidStudio();
-      allow create: if isValidStudio() 
-        && request.resource.data.studioId == request.auth.uid
-        && request.resource.data.keys().hasAll(['gameId', 'studioId', 'type', 'data', 'timestamp']);
+      
+      // Allow creation either through API key or authenticated studio
+      allow create: if
+        // API key path - no auth required, but must have all required fields
+        (request.resource.data.keys().hasAll(['gameId', 'type', 'data', 'timestamp', 'studioId'])) ||
+        // Authenticated studio path
+        (isValidStudio() && 
+         request.resource.data.studioId == request.auth.uid && 
+         request.resource.data.keys().hasAll(['gameId', 'type', 'data', 'timestamp']));
     }
 
     // Quests collection rules

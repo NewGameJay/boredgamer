@@ -7,9 +7,9 @@ export async function middleware(request: NextRequest) {
     const response = new NextResponse(null, {
       status: 204,
       headers: new Headers({
-        'Access-Control-Allow-Origin': 'https://boredgamer.com',
+        'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key',
         'Access-Control-Max-Age': '86400',
       }),
     });
@@ -18,9 +18,9 @@ export async function middleware(request: NextRequest) {
 
   // Add CORS headers to all responses
   const response = NextResponse.next();
-  response.headers.set('Access-Control-Allow-Origin', 'https://boredgamer.com');
+  response.headers.set('Access-Control-Allow-Origin', '*');
   response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key');
 
   const authCookie = request.cookies.get('auth');
   const { pathname, origin } = request.nextUrl;
@@ -71,5 +71,6 @@ export const config = {
     '/sign-in',
     '/sign-up',
     '/:game/:referralSlug',
+    '/api/:path*',  // Add API routes to middleware
   ],
 };

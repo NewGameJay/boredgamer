@@ -6,11 +6,24 @@ export const runtime = 'edge';
 const db = getFirestore(app);
 
 export async function POST(request: Request) {
+  // Handle CORS preflight
+  if (request.method === 'OPTIONS') {
+    return new NextResponse(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
+        'Access-Control-Max-Age': '86400',
+      },
+    });
+  }
+
   try {
     // Get API key from headers
     const apiKey = request.headers.get('x-api-key');
     if (!apiKey) {
-      return NextResponse.json({ error: 'Missing API key' }, { status: 401 });
+      const response = NextResponse.json({ error: 'Missing API key' }, { status: 401 });
     }
 
     // Get request body
@@ -19,10 +32,14 @@ export async function POST(request: Request) {
 
     // Validate required fields
     if (!gameId || !type || !data) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { error: 'Missing required fields: gameId, type, data' },
         { status: 400 }
       );
+      response.headers.set('Access-Control-Allow-Origin', '*');
+      response.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      response.headers.set('Access-Control-Allow-Headers', 'Content-Type, x-api-key');
+      return response;
     }
 
     try {
@@ -32,7 +49,11 @@ export async function POST(request: Request) {
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
+        const response = NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
+        response.headers.set('Access-Control-Allow-Origin', '*');
+        response.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        response.headers.set('Access-Control-Allow-Headers', 'Content-Type, x-api-key');
+        return response;
       }
 
       const studio = querySnapshot.docs[0];
@@ -40,10 +61,14 @@ export async function POST(request: Request) {
 
       // Verify game ID belongs to this studio
       if (studioData.gameId !== gameId) {
-        return NextResponse.json(
+        const response = NextResponse.json(
           { error: 'Game ID does not match studio' },
           { status: 403 }
         );
+        response.headers.set('Access-Control-Allow-Origin', '*');
+        response.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        response.headers.set('Access-Control-Allow-Headers', 'Content-Type, x-api-key');
+        return response;
       }
 
       // Create event document
@@ -64,7 +89,7 @@ export async function POST(request: Request) {
       const eventsRef = collection(db, 'events');
       const docRef = await addDoc(eventsRef, event);
 
-      return NextResponse.json({ 
+      const response = NextResponse.json({ 
         success: true, 
         event: { 
           type, 
@@ -72,19 +97,31 @@ export async function POST(request: Request) {
           id: docRef.id
         } 
       });
+      response.headers.set('Access-Control-Allow-Origin', '*');
+      response.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      response.headers.set('Access-Control-Allow-Headers', 'Content-Type, x-api-key');
+      return response;
     } catch (error: any) {
       console.error('Firestore error:', error);
-      return NextResponse.json(
+      const response = NextResponse.json(
         { error: 'Database error', details: error.message },
         { status: 500 }
       );
+      response.headers.set('Access-Control-Allow-Origin', '*');
+      response.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      response.headers.set('Access-Control-Allow-Headers', 'Content-Type, x-api-key');
+      return response;
     }
   } catch (error: any) {
     console.error('API error:', error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }
     );
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, x-api-key');
+    return response;
   }
 }
 
