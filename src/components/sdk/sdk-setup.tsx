@@ -811,13 +811,13 @@ export class GameAnalytics {
                       <div className="space-y-4">
                         <h4 className="font-medium">API Endpoint</h4>
                         <pre className="bg-slate-900 p-4 rounded-lg overflow-x-auto">
-                          <code className="text-sm text-slate-50">POST /api/events</code>
+                          <code className="text-sm text-slate-50">POST https://boredgamer.com/api/events</code>
                         </pre>
 
                         <h4 className="font-medium">Example Request</h4>
                         <pre className="bg-slate-900 p-4 rounded-lg overflow-x-auto">
                           <code className="text-sm text-slate-50">{`// HTTP Request
-POST /api/events
+POST https://boredgamer.com/api/events
 X-API-Key: your-api-key
 Content-Type: application/json
 
