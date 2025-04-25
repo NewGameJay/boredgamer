@@ -315,7 +315,10 @@ export function SDKSetup() {
     
     const eventsQuery = query(
       collection(db, 'events'),
-      where('studioId', '==', 'bUCf7iCgz4NuD5VQdsi8JrIUVqW2')
+      where('studioId', '==', user.id),
+      where('gameId', '==', savedGameId),
+      orderBy('timestamp', 'desc'),
+      limit(100)
     );
 
     getDocs(eventsQuery).then((snapshot) => {
