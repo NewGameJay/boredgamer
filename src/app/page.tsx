@@ -1,9 +1,53 @@
 "use client";
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import MouseGlow from '@/components/MouseGlow';
+
+
+function RotatingWord() {
+  const words = ['Leaderboards', 'Quests', 'Tournaments', 'Battle Passes', 'Communities', 'Referrals', 'Affiliates', 'Progression', 'LiveOps', 'Analytics'];
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [displayText, setDisplayText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+    const currentWord = words[currentIndex];
+
+    if (isDeleting) {
+      if (displayText === '') {
+        setIsDeleting(false);
+        setCurrentIndex((prevIndex) => (prevIndex + 1) % words.length);
+      } else {
+        timeout = setTimeout(() => {
+          setDisplayText(displayText.slice(0, -1));
+        }, 50);
+      }
+    } else {
+      if (displayText === currentWord) {
+        timeout = setTimeout(() => {
+          setIsDeleting(true);
+        }, 2000);
+      } else {
+        timeout = setTimeout(() => {
+          setDisplayText(currentWord.slice(0, displayText.length + 1));
+        }, 100);
+      }
+    }
+
+    return () => clearTimeout(timeout);
+  }, [displayText, isDeleting, currentIndex, words]);
+
+  return <span className={`rotating-word ${isDeleting ? 'deleting' : ''}`}>{displayText}</span>;
+}
 
 export default function Home() {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   const [activeTab, setActiveTab] = useState('features');
   
   const features = [
@@ -128,7 +172,8 @@ export default function Home() {
   ];
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--gradient-background)' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--gradient-hero-1)' }}>
+      {isMounted && <MouseGlow />}
       {/* Header */}
       <header className="header">
         <div className="container header-container">
@@ -153,12 +198,10 @@ export default function Home() {
         <div className="container">
           <div className="hero-content">
             <h1 className="hero-title">
-              One API Suite 
-              <br />
-              To Engage Your Players
+              Turn Game Data Into Experiences
             </h1>
             <p className="hero-description">
-              Integrate leaderboards, quests, tournaments, battle passes, and more into your game with just a few API calls.
+              Integrate <RotatingWord /> into your game with just a few API calls.
             </p>
             <div className="hero-actions">
               <Link href="/sign-up" className="btn btn-primary btn-lg">
@@ -168,6 +211,22 @@ export default function Home() {
                 View Documentation
               </Link>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="demo-video">
+        <div className="container">
+          <div className="video-wrapper">
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="demo-video-player"
+            >
+              <source src="/leaderboardwalkthrough.mp4" type="video/mp4" />
+            </video>
           </div>
         </div>
       </section>
@@ -185,19 +244,13 @@ export default function Home() {
                   className={`features-tab ${activeTab === 'features' ? 'active' : ''}`}
                   onClick={() => setActiveTab('features')}
                 >
-                  API Features
+                  API Features  
                 </button>
                 <button 
                   className={`features-tab ${activeTab === 'dashboard' ? 'active' : ''}`}
                   onClick={() => setActiveTab('dashboard')}
                 >
-                  Developer Dashboard
-                </button>
-                <button 
-                  className={`features-tab ${activeTab === 'pricing' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('pricing')}
-                >
-                  Pricing
+                  How it Works
                 </button>
               </div>
             </div>
@@ -276,9 +329,10 @@ export default function Home() {
         </div>
       </section>
 
+
       {/* Footer */}
       <footer className="footer">
-        <div className="container">
+        <div className="container"> 
           <div className="footer-grid">
             <div className="footer-section">
               <h3>Product</h3>
