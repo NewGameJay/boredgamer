@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
+import flowchartImage from '../../public/flowchart.png';
 import MouseGlow from '@/components/MouseGlow';
 
 
@@ -275,11 +276,12 @@ export default function Home() {
             {activeTab === 'dashboard' && (
               <div className="dashboard-preview" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection:'column'  }}>
                     <Image
-                      src="/flowchart.png"
+                      src={flowchartImage}
                       alt="BoredGamer Data Flow"
                       width={800}
                       height={500}
-                      style={{ width: '100%', height: 'auto' }}
+                      priority
+                      className="dashboard-image"
                     />
 
                 <Link href="/docs" className="btn btn-secondary btn-lg">
