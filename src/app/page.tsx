@@ -1,6 +1,7 @@
 "use client";
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import MouseGlow from '@/components/MouseGlow';
 
@@ -272,31 +273,18 @@ export default function Home() {
             )}
 
             {activeTab === 'dashboard' && (
-              <div className="dashboard-preview">
-                <div className="dashboard-card">
-                  <div className="dashboard-stats">
-                    <div className="stat-card">
-                      <h4>Active Players</h4>
-                      <p className="stat-value">24,891</p>
-                      <span className="stat-trend positive">↑ 12%</span>
-                    </div>
-                    <div className="stat-card">
-                      <h4>API Requests</h4>
-                      <p className="stat-value">1.2M</p>
-                      <span className="stat-label">98.9% Success</span>
-                    </div>
-                    <div className="stat-card">
-                      <h4>Active Tournaments</h4>
-                      <p className="stat-value">3</p>
-                      <span className="stat-label">128 Players</span>
-                    </div>
-                    <div className="stat-card">
-                      <h4>Creator Revenue</h4>
-                      <p className="stat-value">$12,450</p>
-                      <span className="stat-trend positive">↑ 8%</span>
-                    </div>
-                  </div>
-                </div>
+              <div className="dashboard-preview" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection:'column'  }}>
+                    <Image
+                      src="/flowchart.png"
+                      alt="BoredGamer Data Flow"
+                      width={800}
+                      height={500}
+                      style={{ width: '100%', height: 'auto' }}
+                    />
+
+                <Link href="/docs" className="btn btn-secondary btn-lg">
+                View Documentation
+              </Link>              
               </div>
             )}
 
@@ -331,45 +319,13 @@ export default function Home() {
 
 
       {/* Footer */}
-      <footer className="footer">
-        <div className="container"> 
-          <div className="footer-grid">
-            <div className="footer-section">
-              <h3>Product</h3>
-              <ul>
-                <li><Link href="#features">Features</Link></li>
-                <li><Link href="#pricing">Pricing</Link></li>
-                <li><Link href="#docs">Documentation</Link></li>
-              </ul>
-            </div>
-            <div className="footer-section">
-              <h3>Company</h3>
-              <ul>
-                <li><Link href="#about">About</Link></li>
-                <li><Link href="#blog">Blog</Link></li>
-                <li><Link href="#careers">Careers</Link></li>
-              </ul>
-            </div>
-            <div className="footer-section">
-              <h3>Resources</h3>
-              <ul>
-                <li><Link href="#community">Community</Link></li>
-                <li><Link href="#contact">Contact</Link></li>
-                <li><Link href="#status">Status</Link></li>
-              </ul>
-            </div>
-            <div className="footer-section">
-              <h3>Legal</h3>
-              <ul>
-                <li><Link href="#privacy">Privacy</Link></li>
-                <li><Link href="#terms">Terms</Link></li>
-                <li><Link href="#security">Security</Link></li>
-              </ul>
-            </div>
-          </div>
-          <div className="footer-bottom">
+      <footer className="footer" style={{ padding: '1rem 0 .5rem', marginTop: '3rem' }}>
+          <div className="footer-bottom" style={{ borderTop: 'none' }}>
             <p>&copy; 2025 BoredGamer. All rights reserved.</p>
           </div>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection:'row', gap: '.5rem', paddingBottom: '1rem' }}>
+        <p style={{ textAlign: 'center' }}>Powered by </p>
+        <img style={{ width: '165px', height: 'auto' }} src="/core-knockout-on-dark.png" alt="BoredGamer Logo" />
         </div>
       </footer>
     </div>
