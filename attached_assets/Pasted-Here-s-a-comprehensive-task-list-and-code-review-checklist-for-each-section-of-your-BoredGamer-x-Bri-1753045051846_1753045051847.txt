@@ -1,0 +1,415 @@
+Here's a comprehensive task list and code review checklist for each section of your BoredGamer x BrightMatter implementation:
+
+# 🚀 BoredGamer x BrightMatter: Implementation Task List & Code Reviews
+
+## 📋 Overall Project Status
+- **Frontend (BoredGamer)**: ~70% complete - UI built, needs backend integration
+- **Backend (BrightMatter)**: ~30% complete - Infrastructure ready, processors needed
+- **Integration**: ~20% complete - Basic auth working, full event flow needed
+
+---
+
+## 1️⃣ System Architecture & Data Flow
+
+### Tasks:
+- [ ] Validate event flow from game clients to BrightMatter
+- [ ] Set up proper CORS configuration for game engine requests
+- [ ] Implement API rate limiting for game event endpoints
+- [ ] Create monitoring dashboard for event flow health
+
+### Code Review Checklist:
+```typescript
+// Check: src/app/api/events/route.ts
+- [ ] Validates game API keys properly
+- [ ] Handles different game engine formats (Unity, Unreal, Web)
+- [ ] Implements proper error responses
+- [ ] Logs events for debugging
+
+// Check: brightmatter/processors/event-router.js
+- [ ] Routes events to correct Kafka topics
+- [ ] Handles malformed events gracefully
+- [ ] Implements retry logic
+- [ ] Tracks event metrics
+```
+
+### Next Steps:
+1. Create event ingestion endpoint if missing
+2. Add event validation middleware
+3. Set up event flow monitoring
+
+---
+
+## 2️⃣ Authentication & Security
+
+### Tasks:
+- [ ] Complete Firebase Admin SDK integration in BrightMatter
+- [ ] Implement role-based access control (RBAC) for studios
+- [ ] Add API key generation for game clients
+- [ ] Set up webhook signature verification
+
+### Code Review Checklist:
+```typescript
+// Check: src/lib/firebase-admin.ts
+- [ ] Properly initializes Firebase Admin
+- [ ] Verifies tokens on all protected routes
+- [ ] Extracts user roles correctly
+- [ ] Handles expired tokens
+
+// Check: src/middleware/auth.ts
+- [ ] Validates Firebase tokens
+- [ ] Checks studio permissions
+- [ ] Rate limits by user/studio
+- [ ] Logs auth failures
+
+// Check: brightmatter/auth/verify-token.js
+- [ ] Validates Firebase tokens from BoredGamer
+- [ ] Caches validation results
+- [ ] Handles network failures
+- [ ] Returns proper error codes
+```
+
+### Next Steps:
+1. Implement missing auth middleware
+2. Add studio API key management UI
+3. Create role management interface
+
+---
+
+## 3️⃣ Database Schema & Event Topics
+
+### Tasks:
+- [ ] Run database migrations in RDS
+- [ ] Create all Kafka topics in Redpanda
+- [ ] Set up database connection pooling
+- [ ] Implement database backup strategy
+
+### Code Review Checklist:
+```sql
+-- Check: database/migrations/
+- [ ] All tables from schema.sql are created
+- [ ] Foreign key constraints are proper
+- [ ] Indexes exist for common queries
+- [ ] JSONB fields have proper defaults
+
+-- Check: brightmatter/config/topics.json
+- [ ] All topics are defined with proper partitions
+- [ ] Retention policies are set
+- [ ] Replication factor is appropriate
+- [ ] Topic naming is consistent
+```
+
+### Next Steps:
+1. Run migration scripts
+2. Verify all topics exist in Redpanda
+3. Test database connections from ECS
+
+---
+
+## 4️⃣ Leaderboards
+
+### Tasks:
+- [ ] Complete leaderboard creation API
+- [ ] Implement leaderboard processor
+- [ ] Add score calculation engine
+- [ ] Create leaderboard plugin generator
+- [ ] Add real-time updates via WebSocket
+
+### Code Review Checklist:
+```typescript
+// Check: src/app/api/leaderboards/route.ts
+- [ ] POST creates config.leaderboard event
+- [ ] GET fetches from PostgreSQL
+- [ ] PUT updates leaderboard settings
+- [ ] DELETE handles cascade properly
+
+// Check: brightmatter/processors/leaderboard-processor.js
+- [ ] Subscribes to game.events
+- [ ] Calculates scores based on formula
+- [ ] Updates PostgreSQL atomically
+- [ ] Emits ui.leaderboard.update events
+
+// Check: src/components/leaderboards/LeaderboardPlugin.tsx
+- [ ] Renders leaderboard data
+- [ ] Connects to WebSocket for updates
+- [ ] Handles pagination
+- [ ] Shows loading states
+```
+
+### Next Steps:
+1. Implement score formula parser
+2. Add community gating logic
+3. Create plugin customization UI
+4. Test with sample game events
+
+---
+
+## 5️⃣ Tournaments
+
+### Tasks:
+- [ ] Build tournament scheduling system
+- [ ] Implement tournament state machine
+- [ ] Add bracket generation for elimination tournaments
+- [ ] Create prize distribution logic
+- [ ] Build tournament admin dashboard
+
+### Code Review Checklist:
+```typescript
+// Check: src/app/api/tournaments/route.ts
+- [ ] Validates tournament dates
+- [ ] Checks for scheduling conflicts
+- [ ] Creates proper tournament config
+- [ ] Handles prize pool validation
+
+// Check: brightmatter/processors/tournament-processor.js
+- [ ] Manages tournament lifecycle
+- [ ] Calculates rankings correctly
+- [ ] Triggers reward events at completion
+- [ ] Handles ties and edge cases
+
+// Check: src/components/tournaments/TournamentBracket.tsx
+- [ ] Displays bracket visualization
+- [ ] Updates in real-time
+- [ ] Shows current matches
+- [ ] Handles different tournament types
+```
+
+### Next Steps:
+1. Design tournament state transitions
+2. Implement auto-advancement logic
+3. Add spectator mode
+4. Create tournament templates
+
+---
+
+## 6️⃣ Quests
+
+### Tasks:
+- [ ] Build quest condition evaluator
+- [ ] Implement progress tracking system
+- [ ] Add quest chain support
+- [ ] Create quest template library
+- [ ] Build quest debugging tools
+
+### Code Review Checklist:
+```typescript
+// Check: src/app/api/quests/route.ts
+- [ ] Validates quest requirements schema
+- [ ] Checks date ranges
+- [ ] Handles recurring quests
+- [ ] Supports quest prerequisites
+
+// Check: brightmatter/processors/quest-processor.js
+- [ ] Evaluates complex conditions
+- [ ] Tracks partial progress
+- [ ] Handles quest completion
+- [ ] Emits reward events
+
+// Check: src/components/quests/QuestProgress.tsx
+- [ ] Shows accurate progress
+- [ ] Updates without page refresh
+- [ ] Handles claim button state
+- [ ] Shows time remaining
+```
+
+### Next Steps:
+1. Design quest condition DSL
+2. Implement progress calculation
+3. Add quest analytics
+4. Create quest builder UI
+
+---
+
+## 7️⃣ Battle Passes
+
+### Tasks:
+- [ ] Design XP calculation system
+- [ ] Implement tier progression logic
+- [ ] Add season management
+- [ ] Create purchase flow for premium passes
+- [ ] Build reward claim system
+
+### Code Review Checklist:
+```typescript
+// Check: src/app/api/battlepasses/route.ts
+- [ ] Creates season configuration
+- [ ] Validates tier rewards
+- [ ] Handles XP sources
+- [ ] Manages season transitions
+
+// Check: brightmatter/processors/battlepass-processor.js
+- [ ] Aggregates XP from all sources
+- [ ] Calculates tier progress
+- [ ] Tracks claimed rewards
+- [ ] Handles season end
+
+// Check: src/components/battlepass/BattlePassTracker.tsx
+- [ ] Shows current tier and progress
+- [ ] Displays all rewards
+- [ ] Handles claim interactions
+- [ ] Shows premium upsell
+```
+
+### Next Steps:
+1. Define XP sources and values
+2. Design tier progression curve
+3. Implement purchase integration
+4. Add season scheduling
+
+---
+
+## 8️⃣ Communities & Referral System
+
+### Tasks:
+- [ ] Complete ng.games redirect system
+- [ ] Build member verification flow
+- [ ] Add community moderation tools
+- [ ] Implement referral rewards
+- [ ] Create community analytics
+
+### Code Review Checklist:
+```typescript
+// Check: src/app/api/communities/route.ts
+- [ ] Generates unique referral slugs
+- [ ] Validates community settings
+- [ ] Handles member applications
+- [ ] Manages access control
+
+// Check: brightmatter/processors/community-processor.js
+- [ ] Tracks referral sources
+- [ ] Validates member metadata
+- [ ] Triggers join rewards
+- [ ] Updates member counts
+
+// Check: ng.games redirect logic
+- [ ] Captures referral data
+- [ ] Redirects to correct destination
+- [ ] Tracks conversion metrics
+- [ ] Handles errors gracefully
+```
+
+### Next Steps:
+1. Deploy ng.games redirect service
+2. Add member approval workflow
+3. Create community dashboard
+4. Implement bulk invite system
+
+---
+
+## 9️⃣ Game Events & Fan-out
+
+### Tasks:
+- [ ] Build event normalization system
+- [ ] Implement event deduplication
+- [ ] Add event replay capability
+- [ ] Create event debugging tools
+- [ ] Build event analytics
+
+### Code Review Checklist:
+```typescript
+// Check: brightmatter/processors/event-fanout.js
+- [ ] Routes events to all relevant processors
+- [ ] Handles event ordering
+- [ ] Implements backpressure
+- [ ] Logs processing metrics
+
+// Check: Event schemas
+- [ ] All event types are documented
+- [ ] Validation rules are clear
+- [ ] Backwards compatibility considered
+- [ ] Error events are defined
+```
+
+### Next Steps:
+1. Document all event types
+2. Build event testing tool
+3. Add event versioning
+4. Create event monitor dashboard
+
+---
+
+## 🔟 Reward Fulfillment
+
+### Tasks:
+- [ ] Implement on-chain reward distributor
+- [ ] Build webhook delivery system
+- [ ] Add retry logic for failed rewards
+- [ ] Create reward audit trail
+- [ ] Build manual reward tools
+
+### Code Review Checklist:
+```typescript
+// Check: brightmatter/processors/reward-fulfillment.js
+- [ ] Handles multiple reward types
+- [ ] Implements idempotency
+- [ ] Tracks delivery status
+- [ ] Handles failures gracefully
+
+// Check: On-chain integration
+- [ ] Manages gas efficiently
+- [ ] Batches transactions
+- [ ] Handles chain reorgs
+- [ ] Tracks confirmation
+
+// Check: Webhook delivery
+- [ ] Signs requests properly
+- [ ] Implements exponential backoff
+- [ ] Logs all attempts
+- [ ] Handles timeouts
+```
+
+### Next Steps:
+1. Set up wallet management
+2. Implement webhook signatures
+3. Add manual retry interface
+4. Create fulfillment dashboard
+
+---
+
+## 🏁 Priority Order & Timeline
+
+### Week 1-2: Foundation
+1. Complete authentication system
+2. Run database migrations
+3. Set up event ingestion
+4. Deploy basic monitoring
+
+### Week 3-4: Core Features
+1. Implement leaderboard system end-to-end
+2. Add basic quest functionality
+3. Set up reward fulfillment
+4. Test with sample game
+
+### Week 5-6: Advanced Features
+1. Build tournament system
+2. Implement battle passes
+3. Add community features
+4. Create plugin system
+
+### Week 7-8: Polish & Scale
+1. Add real-time updates
+2. Implement caching layer
+3. Build admin tools
+4. Load test system
+
+---
+
+## 📊 Success Metrics
+
+- [ ] Game events processing at <100ms latency
+- [ ] 99.9% uptime for API endpoints
+- [ ] Rewards fulfilled within 5 minutes
+- [ ] Plugin load time <500ms
+- [ ] Support 10k concurrent users
+- [ ] Process 1M events/day
+
+---
+
+## 🚨 Critical Path Items
+
+1. **Event Ingestion** - Nothing works without this
+2. **Authentication** - Security must be solid
+3. **Leaderboard Processor** - First feature to prove concept
+4. **Reward Fulfillment** - Core value proposition
+5. **Plugin System** - Distribution mechanism
+
+Would you like me to expand on any specific section or create detailed implementation guides for the critical path items?
