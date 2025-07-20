@@ -11,6 +11,7 @@
     "test:watch": "vitest watch"
   },
   "dependencies": {
+    "@eslint/eslintrc": "^3.3.1",
     "@firebasegen/default-connector": "file:dataconnect-generated/js/default-connector",
     "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^4.1.3",
