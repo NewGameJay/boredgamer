@@ -139,7 +139,7 @@ export function SDKSetup() {
     // Query for events where studioId matches the current user's ID
     const eventsQuery = query(
       collection(db, 'events'),
-      where('studioId', '==', 'bUCf7iCgz4NuD5VQdsi8JrIUVqW2')
+      where('studioId', '==', user.id)
       // Temporarily remove orderBy while index builds
       // orderBy('timestamp', 'desc')
     );
@@ -150,7 +150,8 @@ export function SDKSetup() {
         console.log('Got snapshot with', snapshot.docs.length, 'events');
         const newEvents = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
+          metadata: doc.data().metadata || {}
         })) as Event[];
         console.log('New events:', newEvents);
         setEventLogs(newEvents);
@@ -1047,7 +1048,7 @@ void UBoredgamerEvents::TrackEvent(const FString& Type, const TSharedPtr<FJsonOb
                             )}
                           </td>
                           <td className="px-6 py-4 text-slate-500 text-xs whitespace-nowrap">
-                            v{event.metadata.sdkVersion} | {event.metadata.platform}
+                            v{event.metadata?.sdkVersion || 'N/A'} | {event.metadata?.platform || 'N/A'}
                           </td>
                         </tr>
                       ))}
