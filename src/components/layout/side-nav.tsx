@@ -31,25 +31,25 @@ const navigation = [
     name: 'Quests & Challenges',
     href: '/dashboard/quests',
     icon: Target,
-    beta: true
+    beta: false
   },
   {
     name: 'Tournaments',
     href: '/dashboard/tournaments',
     icon: Swords,
-    beta: true
+    beta: false
   },
   {
-    name: 'Matchmaking',
-    href: '/dashboard/matchmaking',
+    name: 'Communities',
+    href: '/dashboard/communities',
     icon: Users,
-    beta: true
+    beta: false
   },
   {
-    name: 'Creator & Affiliates',
-    href: '/dashboard/creators',
+    name: 'Battle Pass',
+    href: '/dashboard/battlepass',
     icon: Star,
-    beta: true
+    beta: false
   }
 ];
 
@@ -67,10 +67,10 @@ export function SideNav() {
         return user.features.quests;
       case '/dashboard/tournaments':
         return user.features.tournaments;
-      case '/dashboard/matchmaking':
-        return user.features.matchmaking;
-      case '/dashboard/creators':
-        return user.features.creatorProgram;
+      case '/dashboard/communities':
+        return user.features.communities;
+      case '/dashboard/battlepass':
+        return user.features.battlepass;
       default:
         return true;
     }
