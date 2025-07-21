@@ -930,53 +930,6 @@ Leaderboard->SubmitScore(1000.0f, "PlayerName");`}
                     </tbody>
                   </table>
                 </div>
-              ) : (
-                <div className="bg-slate-900 text-slate-50 p-4 rounded-lg h-[400px] overflow-y-auto font-mono text-sm">
-                  <table className="w-full border-collapse border border-slate-700 datatable">
-                    <thead className="sticky top-0 bg-slate-900/95 backdrop-blur supports-[backdrop-filter]:bg-slate-900/75">
-                      <tr className="border-b-2 border-slate-600">
-                        <th className="text-left px-6 py-4 text-slate-400 border-r border-slate-700 w-[180px]">Player</th>
-                        <th className="text-left px-6 py-4 text-slate-400 border-r border-slate-700 w-[150px]">Score</th>
-                        <th className="text-left px-6 py-4 text-slate-400 border-r border-slate-700 w-[150px]">Data</th>
-                        <th className="text-left px-6 py-4 text-slate-400 border-r border-slate-700">Type</th>
-                        <th className="text-left px-6 py-4 text-slate-400 w-[150px]">Timestamp</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-700">
-                      {filteredEvents.map((event) => (
-                        <tr key={event.id} className="hover:bg-slate-800/50">
-                          <td className="px-6 py-4 text-purple-400 whitespace-nowrap border-r border-slate-700">
-                            {event.data?.playerName || 'Anonymous'}
-                          </td>
-                          <td className="px-6 py-4 text-emerald-500 text-lg font-semibold whitespace-nowrap">
-                            {event.data?.score?.toLocaleString() || '0'}
-                          </td>
-                          <td className="px-6 py-4 text-slate-400 border-r border-slate-700">
-                            <button
-                              className="flex items-center gap-2 hover:text-slate-200 transition-colors"
-                              onClick={() => toggleEventExpansion(event.id)}
-                            >
-                              <span className={`transform transition-transform ${expandedEvents.has(event.id) ? 'rotate-90' : ''}`}>
-                                ▶
-                              </span>
-                              {expandedEvents.has(event.id) ? (
-                                <pre className="whitespace-pre-wrap">{JSON.stringify(event.data, null, 2)}</pre>
-                              ) : (
-                                'View Data'
-                              )}
-                            </button>
-                          </td>
-                          <td className="px-6 py-4 text-blue-400 whitespace-nowrap border-r border-slate-700">
-                            {event.type}
-                          </td>
-                          <td className="px-6 py-4 text-emerald-400 whitespace-nowrap border-r border-slate-700">
-                            {new Date(event.timestamp?.toDate?.() || event.timestamp).toLocaleString()}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
               )}
             </CardContent>
           </Card>
