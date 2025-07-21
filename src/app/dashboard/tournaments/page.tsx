@@ -24,6 +24,7 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { useRouter } from 'next/navigation';
 import '@/app/dashboard/tournaments/tournaments.css';
 import '@/app/dashboard/quests/quests.css';
+import BracketVisualization from '@/components/tournaments/BracketVisualization';
 
 interface Studio {
   id: string;
@@ -624,9 +625,10 @@ export default function TournamentDashboard() {
                 <TabsList>
                   <TabsTrigger value="edit">Edit Tournaments</TabsTrigger>
                   <TabsTrigger value="live">Live View</TabsTrigger>
+                  <TabsTrigger value="brackets">Brackets</TabsTrigger>
                 </TabsList>
 
-                {['edit', 'live'].map((tab) => (
+                {['edit', 'live', 'brackets'].map((tab) => (
                   <TabsContent key={tab} value={tab}>
                     <div className="grid grid-cols-1 gap-3 mt-4">
                       {filteredTournaments.map((tournament) => (
@@ -753,6 +755,26 @@ export default function TournamentDashboard() {
                     </div>
                   </TabsContent>
                 ))}
+                
+                <TabsContent value="brackets">
+                  <div className="space-y-6">
+                    {filteredTournaments
+                      .filter(t => t.status === 'active' || t.status === 'completed')
+                      .map((tournament) => (
+                      <Card key={tournament.id}>
+                        <CardHeader>
+                          <CardTitle>{tournament.name} - Tournament Brackets</CardTitle>
+                          <CardDescription>
+                            {tournament.currentParticipants} participants • Status: {tournament.status}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <BracketVisualization tournament={tournament} />
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </TabsContent>
               </Tabs>
             </CardContent>
           </Card>
