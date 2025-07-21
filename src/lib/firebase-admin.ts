@@ -1,33 +1,56 @@
-
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 
-let app;
+let app: any;
 
 try {
-  // Check if Firebase Admin is already initialized
-  if (getApps().length === 0) {
-    // Initialize Firebase Admin
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+
+  if (!serviceAccountJson) {
+    console.warn('FIREBASE_SERVICE_ACCOUNT_KEY not set, using default app');
+    // For development, create a minimal app
+    if (!getApps().length) {
+      app = initializeApp({
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'demo-project'
+      });
+    } else {
+      app = getApps()[0];
+    }
+  } else {
+    const serviceAccount = JSON.parse(serviceAccountJson);
+
+    if (!getApps().length) {
+      app = initializeApp({
+        credential: cert(serviceAccount),
+        databaseURL: process.env.FIREBASE_DATABASE_URL
+      });
+    } else {
+      app = getApps()[0];
+    }
+  }
+} catch (error) {
+  console.error('Firebase Admin initialization error:', error);
+  // For development, create a basic app
+  if (!getApps().length) {
     app = initializeApp({
-      credential: cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      }),
-      projectId: process.env.FIREBASE_PROJECT_ID,
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'demo-project'
     });
   } else {
     app = getApps()[0];
   }
-} catch (error) {
-  console.error('Firebase Admin initialization error:', error);
-  throw new Error('Failed to initialize Firebase Admin SDK');
 }
 
 export const auth = getAuth(app);
-export const db = getFirestore(app);
-export { app };
+export const firestore = getFirestore(app);
+
+const admin = {
+  auth,
+  firestore,
+  app
+};
+
+export default admin;
 
 // Helper function to verify tokens
 export async function verifyIdToken(idToken: string) {

@@ -70,7 +70,7 @@ export function SideNav() {
       case '/dashboard/communities':
         return user.features.communities;
       case '/dashboard/battlepass':
-        return user.features.battlepass;
+        return user.features.battlepass || false;
       default:
         return true;
     }

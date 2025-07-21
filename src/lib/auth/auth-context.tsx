@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           const userDoc = await getDoc(doc(db, 'studios', firebaseUser.uid));
           console.log('Fetched user doc:', { exists: userDoc.exists(), data: userDoc.data() });
-          
+
           if (userDoc.exists()) {
             // Studio document exists - set user state and auth cookie
             const userData = userDoc.data() as Studio;
@@ -114,7 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setState({ user: null, loading: true, error: null });
       const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, email, password);
       const userId = firebaseUser.uid;
-      
+
       const studioData = {
         name: studioName,
         email: email,
@@ -128,7 +128,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           matchmaking: true,
           creatorProgram: true,
           communities: true,
-          affiliates: true
+          affiliates: true,
+          battlepass: true
         },
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
@@ -154,10 +155,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signInWithGoogle = async () => {
     try {
       const { user: firebaseUser } = await signInWithPopup(auth, googleProvider);
-      
+
       // Check if studio document exists
       const studioDoc = await getDoc(doc(db, 'studios', firebaseUser.uid));
-      
+
       if (!studioDoc.exists()) {
         // Create new studio document for Google sign-in
         const studioName = firebaseUser.displayName || 'My Studio';
@@ -174,13 +175,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             matchmaking: true,
             creatorProgram: true,
             communities: true,
-            affiliates: true
+            affiliates: true,
+            battlepass: true
           },
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now()
         };
         await setDoc(doc(db, 'studios', firebaseUser.uid), studioData);
-        
+
         // Set the user state immediately after creating the document
         setState({
           user: {
@@ -213,7 +215,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async ({ email, password }: SignInData) => {
     try {
       const { user: firebaseUser } = await signInWithEmailAndPassword(auth, email, password);
-      
+
       // Fetch and set user data immediately
       const userDoc = await getDoc(doc(db, 'studios', firebaseUser.uid));
       if (userDoc.exists()) {

@@ -1,7 +1,6 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import admin from '@/lib/firebase-admin';
+import { firestore as db } from '@/lib/firebase-admin';
 
 const db = admin.firestore();
 
@@ -52,7 +51,7 @@ export async function GET(request: NextRequest) {
   try {
     const headersList = headers();
     const apiKey = headersList.get('x-api-key');
-    
+
     if (!apiKey) {
       return NextResponse.json({ error: 'API key required' }, { status: 401 });
     }
@@ -64,13 +63,13 @@ export async function GET(request: NextRequest) {
     // Get current active battle pass
     let battlePassQuery = db.collection('battlepasses')
       .where('isActive', '==', true);
-    
+
     if (season) {
       battlePassQuery = battlePassQuery.where('season', '==', parseInt(season));
     }
 
     const battlePassSnapshot = await battlePassQuery.limit(1).get();
-    
+
     if (battlePassSnapshot.empty) {
       return NextResponse.json({ 
         battlePass: null,
@@ -83,7 +82,7 @@ export async function GET(request: NextRequest) {
     const battlePass = { id: battlePassDoc.id, ...battlePassDoc.data() } as BattlePass;
 
     let playerProgress: PlayerProgress | null = null;
-    
+
     if (playerId) {
       const progressDoc = await db.collection('battlepass_progress')
         .where('playerId', '==', playerId)
@@ -128,7 +127,7 @@ export async function POST(request: NextRequest) {
   try {
     const headersList = headers();
     const apiKey = headersList.get('x-api-key');
-    
+
     if (!apiKey) {
       return NextResponse.json({ error: 'API key required' }, { status: 401 });
     }
@@ -139,16 +138,16 @@ export async function POST(request: NextRequest) {
     switch (action) {
       case 'add_xp':
         return await addXP(battlePassId, playerId, xpGain);
-      
+
       case 'claim_reward':
         return await claimReward(battlePassId, playerId, tier, rewardType);
-      
+
       case 'purchase_premium':
         return await purchasePremium(battlePassId, playerId);
-      
+
       case 'create_battlepass':
         return await createBattlePass(body.battlePass);
-      
+
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
@@ -163,23 +162,23 @@ async function addXP(battlePassId: string, playerId: string, xpGain: number) {
   const progressRef = db.collection('battlepass_progress')
     .where('playerId', '==', playerId)
     .where('battlePassId', '==', battlePassId);
-  
+
   const progressSnapshot = await progressRef.get();
-  
+
   if (progressSnapshot.empty) {
     throw new Error('Player progress not found');
   }
 
   const progressDoc = progressSnapshot.docs[0];
   const currentProgress = progressDoc.data() as PlayerProgress;
-  
+
   // Get battle pass tiers
   const battlePassDoc = await db.collection('battlepasses').doc(battlePassId).get();
   const battlePass = battlePassDoc.data() as BattlePass;
-  
+
   const newTotalXP = currentProgress.totalXP + xpGain;
   let newTier = currentProgress.currentTier;
-  
+
   // Calculate new tier based on XP
   for (let i = currentProgress.currentTier + 1; i <= battlePass.maxTier; i++) {
     const tierData = battlePass.tiers.find(t => t.tier === i);
@@ -209,9 +208,9 @@ async function claimReward(battlePassId: string, playerId: string, tier: number,
   const progressRef = db.collection('battlepass_progress')
     .where('playerId', '==', playerId)
     .where('battlePassId', '==', battlePassId);
-  
+
   const progressSnapshot = await progressRef.get();
-  
+
   if (progressSnapshot.empty) {
     throw new Error('Player progress not found');
   }
@@ -272,9 +271,9 @@ async function purchasePremium(battlePassId: string, playerId: string) {
   const progressRef = db.collection('battlepass_progress')
     .where('playerId', '==', playerId)
     .where('battlePassId', '==', battlePassId);
-  
+
   const progressSnapshot = await progressRef.get();
-  
+
   if (progressSnapshot.empty) {
     throw new Error('Player progress not found');
   }
@@ -304,7 +303,7 @@ async function createBattlePass(battlePassData: Omit<BattlePass, 'id'>) {
     .get();
 
   const batch = db.batch();
-  
+
   activeSnapshot.docs.forEach(doc => {
     batch.update(doc.ref, { isActive: false });
   });
@@ -330,7 +329,7 @@ async function getTotalPlayers(battlePassId: string): Promise<number> {
     .where('battlePassId', '==', battlePassId)
     .count()
     .get();
-  
+
   return snapshot.data().count;
 }
 
@@ -340,7 +339,7 @@ async function getPremiumPurchases(battlePassId: string): Promise<number> {
     .where('hasPremium', '==', true)
     .count()
     .get();
-  
+
   return snapshot.data().count;
 }
 
@@ -348,12 +347,12 @@ async function getAverageTier(battlePassId: string): Promise<number> {
   const snapshot = await db.collection('battlepass_progress')
     .where('battlePassId', '==', battlePassId)
     .get();
-  
+
   if (snapshot.empty) return 0;
-  
+
   const totalTiers = snapshot.docs.reduce((sum, doc) => {
     return sum + (doc.data().currentTier || 0);
   }, 0);
-  
+
   return totalTiers / snapshot.docs.length;
 }
