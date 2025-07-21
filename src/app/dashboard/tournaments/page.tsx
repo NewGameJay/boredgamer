@@ -165,7 +165,7 @@ export default function TournamentDashboard() {
   // Filtered and sorted tournaments based on date
   const filteredTournaments = useMemo(() => {
     if (!tournaments) return [];
-    
+
     const now = new Date();
     return tournaments.filter(tournament => {
       const startDate = new Date(tournament.startDate);
@@ -249,7 +249,7 @@ export default function TournamentDashboard() {
     try {
       // Create tournament document
       console.log('Creating tournament with user:', user);
-      
+
       const tournamentData = {
         ...formData,
         status: 'draft',
@@ -519,7 +519,7 @@ export default function TournamentDashboard() {
                         </div>
                       </div>
                     </div>
-                  
+
 
                   <div className="grid gap-2">
                     <Label htmlFor="maxParticipants">Max Participants</Label>
@@ -546,6 +546,49 @@ export default function TournamentDashboard() {
                       required
                     />
                   </div>
+
+                  {/* Access Control */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Access Control</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block mb-2">Access Type</label>
+                      <select
+                        value={formData.accessType || 'public'}
+                        onChange={(e) => setFormData({ ...formData, accessType: e.target.value as any })}
+                        className="input w-full"
+                      >
+                        <option value="public">Public (Anyone can join)</option>
+                        <option value="community_gated">Community Gated</option>
+                        <option value="premium_only">Premium Only</option>
+                      </select>
+                    </div>
+                    {formData.accessType === 'community_gated' && (
+                      <div>
+                        <label className="block mb-2">Required Community</label>
+                        <select
+                          value={formData.requiredCommunity || ''}
+                          onChange={(e) => setFormData({ ...formData, requiredCommunity: e.target.value })}
+                          className="input w-full"
+                        >
+                          <option value="">Select Community</option>
+                          <option value="guild_warriors">Guild Warriors</option>
+                          <option value="pro_gamers">Pro Gamers</option>
+                          <option value="speedrunners">Speedrunners</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={formData.requiresVerification || false}
+                      onChange={(e) => setFormData({ ...formData, requiresVerification: e.target.checked })}
+                      className="checkbox"
+                    />
+                    <label>Require Identity Verification</label>
+                  </div>
+                </div>
 
                                   {/* Placement Rewards */}
                 <div className="space-y-4">
@@ -755,7 +798,7 @@ export default function TournamentDashboard() {
                     </div>
                   </TabsContent>
                 ))}
-                
+
                 <TabsContent value="brackets">
                   <div className="space-y-6">
                     {filteredTournaments
@@ -868,7 +911,7 @@ await tournament.submitResults({
           </div>
           <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => setIsEditingDates(false)}>Cancel</Button>
-            <Button onClick={() => {
+            <Button onClick={() => {```python
               if (selectedTournament) {
                 handleUpdateTournament(selectedTournament.id, {
                   startDate: editForm.startDate,

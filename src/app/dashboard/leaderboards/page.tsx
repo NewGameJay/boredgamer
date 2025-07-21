@@ -145,17 +145,17 @@ export default function LeaderboardDashboard() {
         ...doc.data(),
         deltaChange: Math.floor(Math.random() * 5) - 2 // Simulate rank changes
       })) as LeaderboardEntry[];
-      
+
       setRealTimeData(entries);
-      
+
       // Calculate real-time stats
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       const todayEntries = entries.filter(entry => 
         new Date(entry.timestamp) >= today
       );
-      
+
       const uniquePlayerIds = new Set(entries.map(entry => entry.playerName));
       const avgScore = entries.length > 0 
         ? entries.reduce((sum, entry) => sum + entry.score, 0) / entries.length 
@@ -230,7 +230,7 @@ export default function LeaderboardDashboard() {
 
   const handleDelete = async (leaderboardId: string) => {
     if (!confirm('Are you sure you want to delete this leaderboard?')) return;
-    
+
     try {
       await deleteDoc(doc(db, 'Leaderboards', leaderboardId));
       setLeaderboards(prev => prev.filter(board => board.id !== leaderboardId));
@@ -248,7 +248,7 @@ export default function LeaderboardDashboard() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!user) {
       alert('You must be logged in to create a leaderboard');
       return;
@@ -287,7 +287,7 @@ export default function LeaderboardDashboard() {
 
       const leaderboardsRef = collection(db, 'Leaderboards');
       await setDoc(doc(leaderboardsRef, leaderboardData.name), leaderboardData);
-      
+
       // Reset form
       setFormData({
         name: '',
@@ -303,7 +303,7 @@ export default function LeaderboardDashboard() {
       setFields([{ id: 1, value: '', required: false }]);
       setCustomPointsEnabled(false);
       setLengthType('rolling');
-      
+
       alert('Leaderboard created successfully!');
     } catch (error) {
       console.error('Error creating leaderboard:', error);
@@ -330,7 +330,7 @@ export default function LeaderboardDashboard() {
   return (
     <div className="container mx-auto py-10">
       <h1 className="text-4xl font-bold mb-8">Leaderboard Dashboard</h1>
-      
+
       <Tabs defaultValue="manage" className="space-y-4">
         <TabsList>
           <TabsTrigger value="manage">Manage Leaderboards</TabsTrigger>
@@ -372,7 +372,7 @@ function GameUI() {
         layout: 'vertical',     // 'vertical' or 'horizontal'
         limit: 10,             // Number of entries to show
         refreshInterval: 5000,  // Real-time updates every 5 seconds
-        
+
         // Display Options
         showRank: true,        // Show position numbers
         showPlayerName: true,  // Show player names
@@ -382,7 +382,7 @@ function GameUI() {
         showTimestamp: true,  // Show when score was achieved
         showProgress: true,   // Show progress bars for scores
         showDelta: true,      // Show position changes (+1, -2)
-        
+
         // Column Order (left to right)
         columnOrder: [
           'rank',
@@ -392,11 +392,11 @@ function GameUI() {
           'metadata',
           'timestamp'
         ],
-        
+
         // Format Options
         scoreFormat: 'number',  // 'number', 'time', or 'currency'
         dateFormat: 'relative', // 'relative' or 'absolute'
-        
+
         customStyles: {
           background: '#1a1a1a',
           textColor: '#ffffff',
@@ -468,15 +468,15 @@ public:
     // Initialize the leaderboard with your credentials
     UFUNCTION(BlueprintCallable, Category = "Boredgamer")
     void InitializeLeaderboard(FString ApiKey, FString GameId);
-    
+
     // Fetch and update leaderboard data
     UFUNCTION(BlueprintCallable, Category = "Boredgamer")
     void UpdateLeaderboard();
-    
+
     // Submit a new score
     UFUNCTION(BlueprintCallable, Category = "Boredgamer")
     void SubmitScore(float Score, FString PlayerName);
-    
+
     // Bind to score updates
     UFUNCTION(BlueprintImplementableEvent, Category = "Boredgamer")
     void OnLeaderboardUpdated(const TArray<FLeaderboardEntry>& Entries);
@@ -484,7 +484,7 @@ public:
 private:
     // HTTP module for API requests
     FHttpModule* Http;
-    
+
     // WebSocket for real-time updates
     FWebSocketsModule* WebSocket;
 };
@@ -496,7 +496,7 @@ void ULeaderboardWidget::InitializeLeaderboard(FString ApiKey, FString GameId)
     Http = &FHttpModule::Get();
     FHttpRequestRef Request = Http->CreateRequest();
     Request->SetHeader(TEXT("Authorization"), ApiKey);
-    
+
     // Set up WebSocket for real-time updates
     WebSocket = &FWebSocketsModule::Get();
     // Connect to Boredgamer WebSocket endpoint

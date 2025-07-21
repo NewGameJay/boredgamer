@@ -40,6 +40,14 @@ interface BattlePass {
   isActive: boolean;
   premiumPrice: number;
   currency: string;
+  accessType: 'public' | 'community_gated' | 'premium_only';
+  requiredCommunity?: string;
+  requiresVerification: boolean;
+  xpSources: Array<{
+    eventType: string;
+    xpValue: number;
+    description: string;
+  }>;
 }
 
 interface PlayerProgress {
