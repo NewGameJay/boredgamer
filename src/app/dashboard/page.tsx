@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/lib/auth/auth-context';
 import Link from 'next/link';
-import { SDKSetup } from '@/components/sdk/sdk-setup';
+import SDKSetup from '@/components/sdk/sdk-setup';
 
 export default function Dashboard() {
   const { user, loading } = useAuth();
