@@ -4,7 +4,7 @@ import React from 'react';
 import { useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, updateDoc, increment } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, increment, addDoc } from 'firebase/firestore';
 
 export default function CommunityRedirect() {
   const params = useParams();
@@ -39,9 +39,30 @@ export default function CommunityRedirect() {
             lastVisitedAt: new Date().toISOString()
           });
 
-          // Append the referralSlug as the referral token to the destination URL
+          // Generate unique referral token and track the visit
+          const referralToken = `${referralSlug}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          
+          // Create referral tracking record
+          const referralTrackingData = {
+            communityId: communityDoc.id,
+            referralSlug: referralSlug.toString(),
+            referralToken,
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+            userAgent: navigator.userAgent,
+            referrer: document.referrer || 'direct',
+            identified: false
+          };
+
+          try {
+            await addDoc(collection(db, 'referrals'), referralTrackingData);
+          } catch (error) {
+            console.error('Error creating referral tracking:', error);
+          }
+
+          // Append the referral token to the destination URL
           const destinationUrl = new URL(communityData.referralDestination);
-          destinationUrl.searchParams.set('referralToken', referralSlug.toString());
+          destinationUrl.searchParams.set('referralToken', referralToken);
           window.location.href = destinationUrl.toString();
         } else {
           console.error('Community not found');

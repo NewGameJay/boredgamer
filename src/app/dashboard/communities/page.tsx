@@ -235,29 +235,22 @@ export default function CommunityDashboard() {
 
   const fetchIdentifiedUsers = async (communityId: string) => {
     try {
-      const referralsRef = collection(db, 'referrals');
-      const q = query(
-        referralsRef,
-        where('communityId', '==', communityId),
-        where('identified', '==', true),
-        orderBy('identifiedAt', 'desc')
-      );
-
-      const querySnapshot = await getDocs(q);
-      const users: IdentifiedUser[] = [];
-
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        users.push({
-          userId: data.userId,
-          identifier: data.metadata?.username || data.userId,
-          timestamp: data.identifiedAt,
-          referee: data.referee || 'direct'
-        });
-      });
-
-      setIdentifiedUsers(users);
-      setIsViewingIdentified(true);
+      const response = await fetch(`/api/v1/identify?communityId=${communityId}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        const users: IdentifiedUser[] = data.referrals.map((referral: any) => ({
+          userId: referral.userId,
+          identifier: referral.metadata?.username || referral.userId,
+          timestamp: referral.identifiedAt || referral.createdAt,
+          referee: referral.referee || 'direct'
+        }));
+        
+        setIdentifiedUsers(users);
+        setIsViewingIdentified(true);
+      } else {
+        throw new Error(data.error);
+      }
     } catch (error) {
       console.error('Error fetching identified users:', error);
       toast({
