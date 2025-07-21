@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { firestore as db } from '@/lib/firebase-admin';
 
-const db = admin.firestore();
-
 interface BattlePassTier {
   tier: number;
   xpRequired: number;
