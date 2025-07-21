@@ -137,27 +137,10 @@ export class BoredGamerSDK {
 }
 
 // Export types
+export * from './http-client';
+export * from './websocket-client';
+export * from './leaderboard';
 export * from './types';
-
-// Create default instance
-let defaultInstance: BoredGamerSDK | null = null;
-
-/**
- * Initialize the default SDK instance
- */
-export function initializeSDK(config: BoredGamerConfig): BoredGamerSDK {
-  if (!defaultInstance) {
-    defaultInstance = new BoredGamerSDK(config);
-  }
-  return defaultInstance;
-}
-
-/**
- * Get the default SDK instance
- */
-export function getSDK(): BoredGamerSDK {
-  if (!defaultInstance) {
-    throw new Error('SDK not initialized. Call initializeSDK first.');
-  }
-  return defaultInstance;
-}
+export * from './platform/types';
+export * from './platform/platform-factory';
+export * from './platform/platform-detector';
