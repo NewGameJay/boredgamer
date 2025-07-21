@@ -2,18 +2,70 @@ import { BoredGamerConfig, ApiResponse, Player, GameSession, LeaderboardEntry, L
 import { HttpClient } from './http-client';
 import { WebSocketClient } from './websocket-client';
 import { LeaderboardManager } from './leaderboard';
+import { AnalyticsManager } from './analytics';
+import { AdvancedStorageManager } from './storage';
+import { RetryManager, CircuitBreaker } from './resilience';
+import { AdvancedWebSocketClient } from './advanced-websocket';
 
 export class BoredGamerSDK {
   private http: HttpClient;
   private ws: WebSocketClient;
+  private advancedWs: AdvancedWebSocketClient;
   private leaderboard: LeaderboardManager;
+  private analytics: AnalyticsManager;
+  private storage: AdvancedStorageManager;
+  private retryManager: RetryManager;
+  private circuitBreaker: CircuitBreaker;
   private initialized = false;
   private playerId: string | null = null;
 
-  constructor(private config: BoredGamerConfig) {
+  constructor(private config: BoredGamerConfig & { 
+    advanced?: {
+      analytics?: boolean;
+      storage?: boolean;
+      resilience?: boolean;
+      advancedWebSocket?: boolean;
+    }
+  }) {
     this.http = new HttpClient(config);
     this.ws = new WebSocketClient(config);
     this.leaderboard = new LeaderboardManager(this.http, this.ws);
+
+    // Initialize advanced features if enabled
+    if (config.advanced?.analytics !== false) {
+      this.analytics = new AnalyticsManager({
+        batchSize: 10,
+        flushInterval: 5000,
+        debug: false,
+        enableAutoTrack: true
+      }, this.http);
+    }
+
+    if (config.advanced?.resilience !== false) {
+      this.retryManager = new RetryManager({
+        maxAttempts: 3,
+        baseDelay: 1000,
+        maxDelay: 10000,
+        exponentialBase: 2
+      });
+
+      this.circuitBreaker = new CircuitBreaker({
+        failureThreshold: 5,
+        recoveryTimeout: 30000,
+        monitoringPeriod: 60000
+      });
+    }
+
+    if (config.advanced?.advancedWebSocket !== false) {
+      const wsUrl = config.wsUrl || 'wss://api.boredgamer.com/ws';
+      this.advancedWs = new AdvancedWebSocketClient(wsUrl, {
+        enableCompression: true,
+        enableMessageQueue: true,
+        maxQueueSize: 100,
+        heartbeatInterval: 30000,
+        enableBinaryTransport: false
+      });
+    }
   }
 
   /**
@@ -122,11 +174,61 @@ export class BoredGamerSDK {
   }
 
   /**
+   * Analytics methods
+   */
+  public trackEvent(eventName: string, properties?: Record<string, any>): void {
+    if (this.analytics) {
+      this.analytics.track(eventName, properties);
+    }
+  }
+
+  public async flushAnalytics(): Promise<void> {
+    if (this.analytics) {
+      await this.analytics.flush();
+    }
+  }
+
+  /**
+   * Advanced WebSocket methods
+   */
+  public subscribeAdvanced(event: string, handler: (data: any) => void): () => void {
+    if (this.advancedWs) {
+      return this.advancedWs.subscribe(event, handler);
+    }
+    return () => {};
+  }
+
+  public sendAdvanced(type: string, data: any, priority = 1): void {
+    if (this.advancedWs) {
+      this.advancedWs.send(type, data, priority);
+    }
+  }
+
+  /**
+   * Resilient API calls
+   */
+  public async resilientRequest<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.retryManager && this.circuitBreaker) {
+      return this.retryManager.executeWithRetry(operation, this.circuitBreaker);
+    }
+    return operation();
+  }
+
+  /**
+   * Get circuit breaker status
+   */
+  public getCircuitBreakerStatus(): string {
+    return this.circuitBreaker?.getState() || 'UNKNOWN';
+  }
+
+  /**
    * Clean up SDK resources
    */
   public dispose(): void {
     this.ws.disconnect();
+    this.advancedWs?.disconnect();
     this.leaderboard.unsubscribeFromUpdates();
+    this.analytics?.dispose();
     this.initialized = false;
   }
 

@@ -4,6 +4,12 @@ export interface BoredGamerConfig {
   apiUrl?: string;
   wsUrl?: string;
   playerId?: string;
+  advanced?: {
+    analytics?: boolean;
+    storage?: boolean;
+    resilience?: boolean;
+    advancedWebSocket?: boolean;
+  };
 }
 
 export interface ApiResponse<T = any> {
