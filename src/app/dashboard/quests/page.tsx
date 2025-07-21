@@ -95,6 +95,10 @@ export default function QuestDashboard() {
     rewards: [{ type: 'points', amount: 0 }],
     isTemplate: false
   });
+  const [questTemplates, setQuestTemplates] = useState<any>({});
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const { toast } = useToast();
 
   // Filtered and sorted quests based on date
@@ -176,6 +180,46 @@ export default function QuestDashboard() {
 
     return () => unsubscribe();
   }, [user]);
+
+  // Load quest templates
+  useEffect(() => {
+    const loadTemplates = async () => {
+      try {
+        const response = await fetch('/api/quests/templates');
+        const data = await response.json();
+        if (data.success) {
+          setQuestTemplates(data.templates);
+        }
+      } catch (error) {
+        console.error('Error loading templates:', error);
+      }
+    };
+
+    loadTemplates();
+  }, []);
+
+  // Load analytics
+  const loadAnalytics = async (timeframe = '7d') => {
+    if (!user?.id) return;
+    
+    setLoadingAnalytics(true);
+    try {
+      const response = await fetch(`/api/quests/analytics?studioId=${user.id}&timeframe=${timeframe}`);
+      const data = await response.json();
+      if (data.success) {
+        setAnalytics(data.analytics);
+      }
+    } catch (error) {
+      console.error('Error loading analytics:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load analytics",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingAnalytics(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -337,7 +381,9 @@ export default function QuestDashboard() {
       <Tabs defaultValue="create" value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="create">Create Quest</TabsTrigger>
+          <TabsTrigger value="templates">Quest Templates</TabsTrigger>
           <TabsTrigger value="manage">Manage Quests</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="setup">Component Plugin</TabsTrigger>
         </TabsList>
 
@@ -522,6 +568,106 @@ export default function QuestDashboard() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="templates">
+          <Card>
+            <CardHeader>
+              <CardTitle>Quest Templates</CardTitle>
+              <CardDescription>Start with pre-built quest templates for common game mechanics</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {Object.entries(questTemplates).map(([category, templates]) => (
+                  <div key={category} className="space-y-3">
+                    <h3 className="text-lg font-semibold capitalize">{category.replace('_', ' ')} Quests</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {(templates as any[]).map((template) => (
+                        <Card 
+                          key={template.id} 
+                          className={`cursor-pointer transition-all hover:ring-2 hover:ring-primary ${
+                            selectedTemplate === template.id ? 'ring-2 ring-primary' : ''
+                          }`}
+                          onClick={() => setSelectedTemplate(template.id)}
+                        >
+                          <CardContent className="p-4">
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-start">
+                                <h4 className="font-semibold text-sm">{template.name}</h4>
+                                <span className={`text-xs px-2 py-1 rounded-full ${
+                                  template.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
+                                  template.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                  template.difficulty === 'hard' ? 'bg-red-100 text-red-800' :
+                                  'bg-purple-100 text-purple-800'
+                                }`}>
+                                  {template.difficulty}
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground">{template.description}</p>
+                              <div className="text-xs text-muted-foreground">
+                                <div>Est. time: {template.estimatedTime}</div>
+                                <div>Rewards: {template.rewards.map(r => r.type).join(', ')}</div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                
+                {selectedTemplate && (
+                  <div className="mt-6 p-4 border rounded-lg bg-muted/50">
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="font-semibold">Create Quest from Template</h4>
+                      <Button
+                        onClick={async () => {
+                          try {
+                            const response = await fetch('/api/quests/templates', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                templateId: selectedTemplate,
+                                studioId: user.id,
+                                customizations: {
+                                  startDate: new Date().toISOString().slice(0, 16),
+                                  endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)
+                                }
+                              })
+                            });
+                            
+                            const data = await response.json();
+                            if (data.success) {
+                              setFormData({
+                                ...data.quest,
+                                startDate: data.quest.startDate,
+                                endDate: data.quest.endDate,
+                                isTemplate: false
+                              });
+                              setActiveTab('create');
+                              toast({
+                                title: "Template Loaded",
+                                description: "Quest template has been loaded. You can now customize and create it.",
+                              });
+                            }
+                          } catch (error) {
+                            console.error('Error loading template:', error);
+                            toast({
+                              title: "Error",
+                              description: "Failed to load template",
+                              variant: "destructive"
+                            });
+                          }
+                        }}
+                      >
+                        Use This Template
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="manage">
           <Card>
             <CardContent>
@@ -700,6 +846,127 @@ export default function QuestDashboard() {
                   </TabsContent>
                 ))}
               </Tabs>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          <Card>
+            <CardHeader>
+              <CardTitle>Quest Analytics</CardTitle>
+              <CardDescription>Track quest performance and player engagement</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="flex gap-4">
+                  <Button 
+                    variant={loadingAnalytics ? "secondary" : "default"}
+                    onClick={() => loadAnalytics('7d')}
+                    disabled={loadingAnalytics}
+                  >
+                    {loadingAnalytics ? 'Loading...' : 'Last 7 Days'}
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => loadAnalytics('30d')}
+                    disabled={loadingAnalytics}
+                  >
+                    Last 30 Days
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => loadAnalytics('90d')}
+                    disabled={loadingAnalytics}
+                  >
+                    Last 90 Days
+                  </Button>
+                </div>
+
+                {analytics && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="text-2xl font-bold">{analytics.totalQuests}</div>
+                        <div className="text-sm text-muted-foreground">Total Quests</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="text-2xl font-bold text-green-600">{analytics.activeQuests}</div>
+                        <div className="text-sm text-muted-foreground">Active Quests</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="text-2xl font-bold">{analytics.totalCompletions}</div>
+                        <div className="text-sm text-muted-foreground">Total Completions</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="text-2xl font-bold">{analytics.uniquePlayersEngaged}</div>
+                        <div className="text-sm text-muted-foreground">Players Engaged</div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {analytics?.questCompletionRate && Object.keys(analytics.questCompletionRate).length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Quest Completion Rates</h3>
+                    <div className="space-y-2">
+                      {Object.entries(analytics.questCompletionRate).map(([questId, data]: [string, any]) => (
+                        <div key={questId} className="flex items-center justify-between p-3 border rounded">
+                          <div>
+                            <div className="font-medium">{data.questName}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {data.completions} completions from {data.attempts} attempts
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-bold">{data.rate}%</div>
+                            <div className="text-xs text-muted-foreground">completion rate</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {analytics?.rewardDistribution && Object.keys(analytics.rewardDistribution).length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Reward Distribution</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {Object.entries(analytics.rewardDistribution).map(([rewardType, data]: [string, any]) => (
+                        <Card key={rewardType}>
+                          <CardContent className="p-4">
+                            <div className="text-lg font-bold">{data.total.toLocaleString()}</div>
+                            <div className="text-sm text-muted-foreground capitalize">{rewardType} distributed</div>
+                            <div className="text-xs text-muted-foreground">{data.count} awards</div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {analytics?.timeToCompletion && Object.keys(analytics.timeToCompletion).length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Average Time to Completion</h3>
+                    <div className="space-y-2">
+                      {Object.entries(analytics.timeToCompletion).map(([questId, data]: [string, any]) => (
+                        <div key={questId} className="flex items-center justify-between p-3 border rounded">
+                          <div className="font-medium">{data.questName}</div>
+                          <div className="text-right">
+                            <div className="text-lg font-bold">{data.averageHours}h</div>
+                            <div className="text-xs text-muted-foreground">{data.completions} completions</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
