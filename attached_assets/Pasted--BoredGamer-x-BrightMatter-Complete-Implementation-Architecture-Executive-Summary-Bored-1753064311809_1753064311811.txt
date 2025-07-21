@@ -1,0 +1,2724 @@
+# 🧠 BoredGamer x BrightMatter: Complete Implementation Architecture
+
+## 📘 Executive Summary
+
+BoredGamer is a comprehensive platform that empowers game studios to create engaging player experiences through quests, tournaments, leaderboards, communities, and battle passes that integrate directly with their games. BrightMatter serves as the robust, event-driven backend infrastructure powering these experiences.
+
+**Key Architecture Principles:**
+- **Separation of Concerns**: BoredGamer handles UI/UX, BrightMatter handles data processing
+- **Event-Driven Design**: All game data flows through Kafka topics for real-time processing
+- **Plugin Ecosystem**: Embeddable widgets for seamless in-game integration
+- **Community-First**: Everything can be gated and managed through community systems
+
+**Current Status:**
+- BoredGamer Frontend: Live at boredgamer.com with most features implemented
+- BrightMatter Backend: Operational with Redpanda, RDS, and ECS deployment
+- Firebase Auth: Integrated for user management and role-based access
+- Community Redirect: ng.games domain configured for referral tracking
+
+---
+
+## 📑 Table of Contents
+
+1. [System Architecture & Data Flow](#system-architecture--data-flow)
+2. [Authentication & Security Architecture](#authentication--security-architecture)
+3. [Database Schema & Event Topics](#database-schema--event-topics)
+4. [Feature Implementation Guide](#feature-implementation-guide)
+   - [Leaderboards](#leaderboards)
+   - [Tournaments](#tournaments)
+   - [Quests](#quests)
+   - [Battle Passes](#battle-passes)
+   - [Communities & Referral System](#communities--referral-system)
+5. [Plugin System & Game Engine Integration](#plugin-system--game-engine-integration)
+6. [Reward Fulfillment Architecture](#reward-fulfillment-architecture)
+7. [Real-time Updates & WebSocket Implementation](#real-time-updates--websocket-implementation)
+8. [Error Handling & Monitoring](#error-handling--monitoring)
+9. [Implementation Roadmap](#implementation-roadmap)
+10. [Deployment & Infrastructure](#deployment--infrastructure)
+
+---
+
+## 1. System Architecture & Data Flow
+
+### 🏗️ High-Level Architecture
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Game Client   │    │   BoredGamer    │    │   BrightMatter  │
+│                 │    │    Frontend     │    │    Backend      │
+│ - Unity         │◄──►│ - Next.js 13    │◄──►│ - Redpanda      │
+│ - Unreal        │    │ - Firebase Auth │    │ - PostgreSQL    │
+│ - Web Games     │    │ - Dashboard UI  │    │ - ECS Services  │
+│ - Mobile        │    │ - Plugin Gen    │    │ - Event Proc.   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                        │                        │
+         │                        │                        │
+         └────────── Event Flow ──────────────────────────┘
+                    (game.events → processors → rewards)
+```
+
+### 🔄 Event Flow Architecture
+
+**App Responsibility Matrix:**
+
+| Component | BoredGamer | BrightMatter | Purpose |
+|-----------|------------|--------------|---------|
+| **Campaign Creation** | ✅ UI Forms | ❌ | User-friendly creation interface |
+| **Config Storage** | ❌ | ✅ RDS + Kafka | Persistent campaign definitions |
+| **Event Ingestion** | ❌ | ✅ Redpanda | High-throughput game event processing |
+| **Progress Calculation** | ❌ | ✅ ECS Processors | Real-time quest/leaderboard updates |
+| **Reward Fulfillment** | ❌ | ✅ ECS Services | On-chain and webhook delivery |
+| **Dashboard Views** | ✅ API Calls | ✅ Data Queries | Real-time campaign management |
+| **Plugin Generation** | ✅ SDK/Embed | ❌ | Customizable in-game widgets |
+| **Community Auth** | ✅ Separate Portal | ✅ Member Validation | Community-specific dashboards |
+
+### 📊 Data Flow Sequence
+
+```
+1. Studio creates campaign in BoredGamer dashboard
+   ↓
+2. BoredGamer POST /api/campaigns → BrightMatter config.* topic
+   ↓
+3. BrightMatter config-processor stores in PostgreSQL
+   ↓
+4. Game emits events → BrightMatter /events endpoint
+   ↓
+5. Events flow through Redpanda → game.events topic
+   ↓
+6. Specialized processors (quest, leaderboard, tournament, battlepass)
+   ↓
+7. Progress updates → PostgreSQL + ui.* topics for real-time sync
+   ↓
+8. Reward triggers → reward.events → fulfillment services
+   ↓
+9. Plugin requests → BoredGamer API → BrightMatter data queries
+   ↓
+10. Real-time updates via WebSocket → Dashboard & Plugin refresh
+```
+
+---
+
+## 2. Authentication & Security Architecture
+
+### 🔐 Multi-Tier Authentication System
+
+**Firebase Integration (BoredGamer):**
+```typescript
+// src/lib/firebase-admin.ts (BoredGamer)
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+
+const firebaseAdmin = getApps().length === 0 ? initializeApp({
+  credential: cert({
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  }),
+}) : getApps()[0];
+
+export const auth = getAuth(firebaseAdmin);
+
+// Middleware for API routes
+export async function validateFirebaseToken(token: string) {
+  try {
+    const decodedToken = await auth.verifyIdToken(token);
+    return {
+      uid: decodedToken.uid,
+      email: decodedToken.email,
+      role: decodedToken.role || 'user'
+    };
+  } catch (error) {
+    throw new Error('Invalid Firebase token');
+  }
+}
+```
+
+**BrightMatter Token Validation:**
+```typescript
+// brightmatter/src/middleware/auth.ts
+import { validateFirebaseToken } from './firebase-validator';
+
+export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing or invalid authorization header' });
+  }
+  
+  const token = authHeader.substring(7);
+  
+  try {
+    const user = await validateFirebaseToken(token);
+    req.user = user;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+}
+```
+
+### 🛡️ Role-Based Access Control
+
+**User Roles:**
+- **studio_owner**: Can create/manage campaigns for their games
+- **community_admin**: Can manage community members and campaigns
+- **community_member**: Can participate in gated campaigns
+- **player**: Basic access to public campaigns
+
+**Community Authentication Flow:**
+```typescript
+// Community-specific login portal (separate from main BoredGamer)
+// URL: community.boredgamer.com or integrated community dashboard
+
+interface CommunityAuth {
+  communityId: string;
+  adminEmail: string;
+  members: {
+    userId: string;
+    joinedAt: Date;
+    metadata: Record<string, any>;
+    status: 'active' | 'banned' | 'pending';
+  }[];
+}
+```
+
+---
+
+## 3. Database Schema & Event Topics
+
+### 🗄️ PostgreSQL Schema (BrightMatter)
+
+```sql
+-- Core Tables
+CREATE TABLE studios (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  firebase_uid TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  api_key TEXT UNIQUE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE games (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  studio_id UUID REFERENCES studios(id),
+  name TEXT NOT NULL,
+  identifier TEXT UNIQUE NOT NULL, -- Used in API calls
+  webhook_url TEXT, -- For reward fulfillment
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Communities (Guilds)
+CREATE TABLE communities (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  studio_id UUID REFERENCES studios(id),
+  name TEXT NOT NULL,
+  referral_slug TEXT UNIQUE NOT NULL,
+  redirect_url TEXT NOT NULL,
+  is_open BOOLEAN DEFAULT false,
+  member_metadata JSONB NOT NULL, -- {type: "wallet", required_fields: ["address"]}
+  starter_reward JSONB, -- Reward for joining
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE community_members (
+  id BIGSERIAL PRIMARY KEY,
+  community_id UUID REFERENCES communities(id),
+  user_id TEXT NOT NULL, -- Can be wallet, email, username, etc.
+  user_metadata JSONB NOT NULL,
+  referral_source TEXT, -- Who referred them
+  joined_at TIMESTAMPTZ DEFAULT NOW(),
+  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'banned', 'pending')),
+  UNIQUE(community_id, user_id)
+);
+
+-- Campaigns
+CREATE TABLE campaigns (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  studio_id UUID REFERENCES studios(id),
+  game_id UUID REFERENCES games(id),
+  type TEXT NOT NULL CHECK (type IN ('leaderboard', 'tournament', 'quest', 'battlepass')),
+  name TEXT NOT NULL,
+  config JSONB NOT NULL,
+  gating JSONB DEFAULT '{}', -- Community gating rules
+  start_date TIMESTAMPTZ,
+  end_date TIMESTAMPTZ,
+  status TEXT DEFAULT 'active' CHECK (status IN ('draft', 'active', 'completed', 'cancelled')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- User Progress Tracking
+CREATE TABLE user_progress (
+  id BIGSERIAL PRIMARY KEY,
+  campaign_id UUID REFERENCES campaigns(id),
+  user_id TEXT NOT NULL,
+  progress_data JSONB NOT NULL, -- Flexible progress storage
+  current_value NUMERIC DEFAULT 0, -- For quick sorting/filtering
+  completed BOOLEAN DEFAULT false,
+  completed_at TIMESTAMPTZ,
+  last_updated TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(campaign_id, user_id)
+);
+
+-- Battle Pass Specific
+CREATE TABLE battlepass_user_progress (
+  id BIGSERIAL PRIMARY KEY,
+  campaign_id UUID REFERENCES campaigns(id),
+  user_id TEXT NOT NULL,
+  current_tier INTEGER DEFAULT 1,
+  total_xp NUMERIC DEFAULT 0,
+  claimed_rewards JSONB DEFAULT '[]', -- Array of claimed tier IDs
+  purchased BOOLEAN DEFAULT false,
+  purchased_at TIMESTAMPTZ,
+  UNIQUE(campaign_id, user_id)
+);
+
+-- Reward System
+CREATE TABLE reward_fulfillments (
+  id BIGSERIAL PRIMARY KEY,
+  campaign_id UUID REFERENCES campaigns(id),
+  user_id TEXT NOT NULL,
+  reward_type TEXT NOT NULL CHECK (reward_type IN ('nft', 'token', 'in_game', 'webhook')),
+  reward_config JSONB NOT NULL,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+  transaction_hash TEXT, -- For on-chain rewards
+  fulfillment_data JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  completed_at TIMESTAMPTZ
+);
+
+-- Events Storage (for analytics and replay)
+CREATE TABLE game_events (
+  id BIGSERIAL PRIMARY KEY,
+  game_id UUID REFERENCES games(id),
+  user_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  event_data JSONB NOT NULL,
+  source TEXT, -- Game client identifier
+  processed_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL
+);
+
+-- Indexes for performance
+CREATE INDEX idx_user_progress_campaign_user ON user_progress(campaign_id, user_id);
+CREATE INDEX idx_user_progress_value ON user_progress(campaign_id, current_value DESC);
+CREATE INDEX idx_community_members_community ON community_members(community_id);
+CREATE INDEX idx_game_events_game_user ON game_events(game_id, user_id);
+CREATE INDEX idx_campaigns_studio_type ON campaigns(studio_id, type);
+```
+
+### 📨 Kafka Topics (BrightMatter - Redpanda)
+
+**Topic Structure:**
+```yaml
+# Configuration Topics
+config.campaigns:
+  partitions: 3
+  replication: 3
+  cleanup.policy: "compact"
+
+config.communities:
+  partitions: 3
+  replication: 3
+  cleanup.policy: "compact"
+
+# Event Topics
+game.events:
+  partitions: 6
+  replication: 3
+  retention.ms: 604800000 # 7 days
+
+# Processing Topics
+quest.progress:
+  partitions: 6
+  replication: 3
+
+leaderboard.updates:
+  partitions: 6
+  replication: 3
+
+tournament.events:
+  partitions: 3
+  replication: 3
+
+battlepass.progress:
+  partitions: 6
+  replication: 3
+
+# Reward Topics
+reward.events:
+  partitions: 3
+  replication: 3
+
+reward.status:
+  partitions: 3
+  replication: 3
+
+# UI Updates
+ui.campaign_updates:
+  partitions: 3
+  replication: 3
+
+ui.leaderboard_refresh:
+  partitions: 3
+  replication: 3
+
+# Community Topics
+community.joins:
+  partitions: 3
+  replication: 3
+
+community.events:
+  partitions: 3
+  replication: 3
+```
+
+---
+
+## 4. Feature Implementation Guide
+
+## Leaderboards
+
+### 📊 Create Tab Implementation (BoredGamer)
+
+**Component: `/src/app/leaderboards/create/page.tsx`**
+```typescript
+'use client';
+
+import { useState } from 'react';
+import { useAuth } from '@/lib/auth-context';
+import { createLeaderboard } from '@/lib/api/leaderboards';
+
+interface LeaderboardConfig {
+  name: string;
+  gameId: string;
+  dateRange: {
+    start?: Date;
+    end?: Date;
+    ongoing: boolean;
+  };
+  refreshFrequency: 'real-time' | 'hourly' | 'daily';
+  scoringMetadata: {
+    eventType: string;
+    dataField: string;
+    aggregation: 'sum' | 'max' | 'count' | 'average';
+  };
+  customFormula?: string; // Advanced scoring
+  gating: {
+    communities?: string[];
+    whitelist?: string[];
+    minLevel?: number;
+  };
+  displayConfig: {
+    maxEntries: number;
+    showPlayerCount: boolean;
+    theme: 'default' | 'dark' | 'custom';
+  };
+}
+
+export default function CreateLeaderboard() {
+  const { user } = useAuth();
+  const [config, setConfig] = useState<LeaderboardConfig>({
+    name: '',
+    gameId: '',
+    dateRange: { ongoing: true },
+    refreshFrequency: 'real-time',
+    scoringMetadata: {
+      eventType: 'MATCH_END',
+      dataField: 'score',
+      aggregation: 'sum'
+    },
+    gating: {},
+    displayConfig: {
+      maxEntries: 100,
+      showPlayerCount: true,
+      theme: 'default'
+    }
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      const leaderboard = await createLeaderboard(config);
+      // Redirect to manage tab
+      window.location.href = `/leaderboards/manage/${leaderboard.id}`;
+    } catch (error) {
+      console.error('Failed to create leaderboard:', error);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div>
+        <label className="block text-sm font-medium">Leaderboard Name</label>
+        <input
+          type="text"
+          value={config.name}
+          onChange={(e) => setConfig({...config, name: e.target.value})}
+          className="mt-1 block w-full rounded-md border-gray-300"
+          required
+        />
+      </div>
+
+      {/* Game Selection */}
+      <GameSelector 
+        value={config.gameId}
+        onChange={(gameId) => setConfig({...config, gameId})}
+      />
+
+      {/* Date Range */}
+      <div className="space-y-4">
+        <label className="flex items-center">
+          <input
+            type="checkbox"
+            checked={config.dateRange.ongoing}
+            onChange={(e) => setConfig({
+              ...config,
+              dateRange: {...config.dateRange, ongoing: e.target.checked}
+            })}
+          />
+          <span className="ml-2">Ongoing Leaderboard</span>
+        </label>
+
+        {!config.dateRange.ongoing && (
+          <DateRangePicker
+            start={config.dateRange.start}
+            end={config.dateRange.end}
+            onChange={(start, end) => setConfig({
+              ...config,
+              dateRange: {...config.dateRange, start, end}
+            })}
+          />
+        )}
+      </div>
+
+      {/* Scoring Configuration */}
+      <ScoringConfigSection
+        config={config.scoringMetadata}
+        onChange={(scoringMetadata) => setConfig({...config, scoringMetadata})}
+      />
+
+      {/* Community Gating */}
+      <GatingConfigSection
+        config={config.gating}
+        onChange={(gating) => setConfig({...config, gating})}
+      />
+
+      <button
+        type="submit"
+        className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"
+      >
+        Create Leaderboard
+      </button>
+    </form>
+  );
+}
+```
+
+**API Handler: `/src/app/api/leaderboards/route.ts`**
+```typescript
+import { NextRequest, NextResponse } from 'next/server';
+import { validateFirebaseToken } from '@/lib/firebase-admin';
+import { publishToBrightMatter } from '@/lib/brightmatter-client';
+
+export async function POST(request: NextRequest) {
+  try {
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader) {
+      return NextResponse.json({ error: 'Missing authorization' }, { status: 401 });
+    }
+
+    const user = await validateFirebaseToken(authHeader.replace('Bearer ', ''));
+    const config = await request.json();
+
+    // Validate config
+    if (!config.name || !config.gameId) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    const leaderboardConfig = {
+      type: 'LEADERBOARD_CREATE',
+      id: crypto.randomUUID(),
+      studioId: user.uid,
+      gameId: config.gameId,
+      name: config.name,
+      config: {
+        dateRange: config.dateRange,
+        refreshFrequency: config.refreshFrequency,
+        scoringMetadata: config.scoringMetadata,
+        customFormula: config.customFormula,
+        gating: config.gating,
+        displayConfig: config.displayConfig
+      },
+      createdAt: new Date().toISOString()
+    };
+
+    // Send to BrightMatter
+    await publishToBrightMatter('config.campaigns', leaderboardConfig);
+
+    return NextResponse.json({ 
+      id: leaderboardConfig.id,
+      message: 'Leaderboard created successfully' 
+    });
+
+  } catch (error) {
+    console.error('Error creating leaderboard:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+```
+
+### 🎯 BrightMatter Leaderboard Processor
+
+**Service: `brightmatter/src/processors/leaderboard-processor.ts`**
+```typescript
+import { Consumer } from 'kafkajs';
+import { Pool } from 'pg';
+import { createKafkaClient } from '../config/kafka';
+
+interface LeaderboardEvent {
+  type: string;
+  campaignId: string;
+  userId: string;
+  gameId: string;
+  eventData: any;
+  timestamp: string;
+}
+
+class LeaderboardProcessor {
+  private consumer: Consumer;
+  private db: Pool;
+
+  constructor(db: Pool) {
+    this.db = db;
+    const kafka = createKafkaClient();
+    this.consumer = kafka.consumer({ groupId: 'leaderboard-processor' });
+  }
+
+  async start() {
+    await this.consumer.subscribe({ 
+      topics: ['game.events', 'config.campaigns'] 
+    });
+
+    await this.consumer.run({
+      eachMessage: async ({ topic, message }) => {
+        const event = JSON.parse(message.value!.toString());
+
+        switch (topic) {
+          case 'config.campaigns':
+            if (event.type === 'LEADERBOARD_CREATE') {
+              await this.handleLeaderboardCreate(event);
+            }
+            break;
+
+          case 'game.events':
+            await this.handleGameEvent(event);
+            break;
+        }
+      }
+    });
+  }
+
+  private async handleLeaderboardCreate(event: any) {
+    const query = `
+      INSERT INTO campaigns (id, studio_id, game_id, type, name, config, gating, start_date, end_date, status)
+      VALUES ($1, $2, $3, 'leaderboard', $4, $5, $6, $7, $8, 'active')
+    `;
+
+    const values = [
+      event.id,
+      event.studioId,
+      event.gameId,
+      event.name,
+      JSON.stringify(event.config),
+      JSON.stringify(event.config.gating || {}),
+      event.config.dateRange?.start || null,
+      event.config.dateRange?.end || null
+    ];
+
+    await this.db.query(query, values);
+    console.log(`Leaderboard created: ${event.id}`);
+  }
+
+  private async handleGameEvent(event: LeaderboardEvent) {
+    // Find relevant leaderboards for this game and event type
+    const leaderboardQuery = `
+      SELECT c.id, c.config, c.gating
+      FROM campaigns c
+      WHERE c.game_id = $1 
+        AND c.type = 'leaderboard'
+        AND c.status = 'active'
+        AND (c.start_date IS NULL OR c.start_date <= NOW())
+        AND (c.end_date IS NULL OR c.end_date >= NOW())
+    `;
+
+    const leaderboards = await this.db.query(leaderboardQuery, [event.gameId]);
+
+    for (const leaderboard of leaderboards.rows) {
+      await this.processLeaderboardUpdate(leaderboard, event);
+    }
+  }
+
+  private async processLeaderboardUpdate(leaderboard: any, event: LeaderboardEvent) {
+    const config = leaderboard.config;
+    const gating = leaderboard.gating;
+
+    // Check if event matches scoring criteria
+    if (config.scoringMetadata.eventType !== event.eventData.type) {
+      return;
+    }
+
+    // Check community gating
+    if (gating.communities && gating.communities.length > 0) {
+      const userCommunityCheck = await this.checkUserCommunityAccess(
+        event.userId, 
+        gating.communities
+      );
+      if (!userCommunityCheck) return;
+    }
+
+    // Calculate score based on configuration
+    const score = await this.calculateScore(config.scoringMetadata, event.eventData);
+    if (score === null) return;
+
+    // Update user progress
+    await this.updateUserLeaderboardProgress(leaderboard.id, event.userId, score);
+
+    // Emit UI update event
+    await this.emitLeaderboardUpdate(leaderboard.id);
+  }
+
+  private async calculateScore(scoringConfig: any, eventData: any): Promise<number | null> {
+    const { dataField, aggregation } = scoringConfig;
+    const rawValue = this.extractValue(eventData.data, dataField);
+
+    if (rawValue === undefined || rawValue === null) return null;
+
+    // For now, return the raw value
+    // In the future, implement custom formula parsing
+    return Number(rawValue);
+  }
+
+  private extractValue(data: any, field: string): any {
+    return field.split('.').reduce((obj, key) => obj?.[key], data);
+  }
+
+  private async updateUserLeaderboardProgress(campaignId: string, userId: string, newScore: number) {
+    const query = `
+      INSERT INTO user_progress (campaign_id, user_id, current_value, progress_data)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (campaign_id, user_id)
+      DO UPDATE SET 
+        current_value = user_progress.current_value + $3,
+        progress_data = $4,
+        last_updated = NOW()
+    `;
+
+    const progressData = {
+      totalScore: newScore,
+      lastUpdate: new Date().toISOString()
+    };
+
+    await this.db.query(query, [campaignId, userId, newScore, JSON.stringify(progressData)]);
+  }
+
+  private async checkUserCommunityAccess(userId: string, communities: string[]): Promise<boolean> {
+    const query = `
+      SELECT 1 FROM community_members cm
+      JOIN communities c ON cm.community_id = c.id
+      WHERE cm.user_id = $1 
+        AND c.id = ANY($2)
+        AND cm.status = 'active'
+      LIMIT 1
+    `;
+
+    const result = await this.db.query(query, [userId, communities]);
+    return result.rows.length > 0;
+  }
+
+  private async emitLeaderboardUpdate(campaignId: string) {
+    // Emit to UI update topic for real-time dashboard updates
+    const kafka = createKafkaClient();
+    const producer = kafka.producer();
+    
+    await producer.send({
+      topic: 'ui.leaderboard_refresh',
+      messages: [{
+        key: campaignId,
+        value: JSON.stringify({
+          type: 'LEADERBOARD_UPDATE',
+          campaignId,
+          timestamp: new Date().toISOString()
+        })
+      }]
+    });
+
+    await producer.disconnect();
+  }
+}
+
+export default LeaderboardProcessor;
+```
+
+---
+
+## Tournaments
+
+### 🏆 Tournament Implementation (Enhanced from Leaderboards)
+
+**Create Tab Component: `/src/app/tournaments/create/page.tsx`**
+```typescript
+'use client';
+
+import { useState } from 'react';
+import { createTournament } from '@/lib/api/tournaments';
+
+interface TournamentConfig {
+  name: string;
+  gameId: string;
+  startDate: Date;
+  endDate: Date;
+  maxParticipants?: number;
+  entryRequirements: {
+    fee?: number;
+    tokenType?: 'native' | 'erc20' | 'nft';
+    communities?: string[];
+    minLevel?: number;
+  };
+  prizePool: {
+    totalValue: number;
+    distribution: { rank: number; percentage: number }[];
+    rewardType: 'token' | 'nft' | 'in_game' | 'webhook';
+    rewardConfig: any;
+  };
+  scoringConfig: {
+    eventType: string;
+    dataField: string;
+    aggregation: 'sum' | 'max' | 'count';
+    formula?: string;
+  };
+}
+
+export default function CreateTournament() {
+  const [config, setConfig] = useState<TournamentConfig>({
+    name: '',
+    gameId: '',
+    startDate: new Date(),
+    endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 week from now
+    entryRequirements: {},
+    prizePool: {
+      totalValue: 1000,
+      distribution: [
+        { rank: 1, percentage: 50 },
+        { rank: 2, percentage: 30 },
+        { rank: 3, percentage: 20 }
+      ],
+      rewardType: 'token',
+      rewardConfig: {}
+    },
+    scoringConfig: {
+      eventType: 'MATCH_END',
+      dataField: 'score',
+      aggregation: 'sum'
+    }
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      const tournament = await createTournament(config);
+      window.location.href = `/tournaments/manage/${tournament.id}`;
+    } catch (error) {
+      console.error('Failed to create tournament:', error);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-8">
+      {/* Basic Info */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">Tournament Details</h2>
+        
+        <div>
+          <label className="block text-sm font-medium">Tournament Name</label>
+          <input
+            type="text"
+            value={config.name}
+            onChange={(e) => setConfig({...config, name: e.target.value})}
+            className="mt-1 block w-full rounded-md border-gray-300"
+            required
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium">Start Date</label>
+            <input
+              type="datetime-local"
+              value={config.startDate.toISOString().slice(0, 16)}
+              onChange={(e) => setConfig({...config, startDate: new Date(e.target.value)})}
+              className="mt-1 block w-full rounded-md border-gray-300"
+              required
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium">End Date</label>
+            <input
+              type="datetime-local"
+              value={config.endDate.toISOString().slice(0, 16)}
+              onChange={(e) => setConfig({...config, endDate: new Date(e.target.value)})}
+              className="mt-1 block w-full rounded-md border-gray-300"
+              required
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Prize Pool Configuration */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">Prize Pool</h2>
+        
+        <div>
+          <label className="block text-sm font-medium">Total Prize Value</label>
+          <input
+            type="number"
+            value={config.prizePool.totalValue}
+            onChange={(e) => setConfig({
+              ...config, 
+              prizePool: {...config.prizePool, totalValue: Number(e.target.value)}
+            })}
+            className="mt-1 block w-full rounded-md border-gray-300"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">Reward Type</label>
+          <select
+            value={config.prizePool.rewardType}
+            onChange={(e) => setConfig({
+              ...config,
+              prizePool: {...config.prizePool, rewardType: e.target.value as any}
+            })}
+            className="mt-1 block w-full rounded-md border-gray-300"
+          >
+            <option value="token">ERC-20 Token</option>
+            <option value="nft">NFT</option>
+            <option value="in_game">In-Game Items</option>
+            <option value="webhook">Custom Webhook</option>
+          </select>
+        </div>
+
+        {/* Prize Distribution */}
+        <div>
+          <label className="block text-sm font-medium mb-2">Prize Distribution</label>
+          {config.prizePool.distribution.map((prize, index) => (
+            <div key={index} className="flex items-center space-x-4 mb-2">
+              <span className="w-16">Rank {prize.rank}:</span>
+              <input
+                type="number"
+                value={prize.percentage}
+                onChange={(e) => {
+                  const newDistribution = [...config.prizePool.distribution];
+                  newDistribution[index].percentage = Number(e.target.value);
+                  setConfig({
+                    ...config,
+                    prizePool: {...config.prizePool, distribution: newDistribution}
+                  });
+                }}
+                className="w-20 rounded-md border-gray-300"
+                min="0"
+                max="100"
+              />
+              <span>%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        className="w-full bg-purple-600 text-white py-3 px-4 rounded-md hover:bg-purple-700"
+      >
+        Create Tournament
+      </button>
+    </form>
+  );
+}
+```
+
+---
+
+## Quests
+
+### 🎯 Quest System Implementation
+
+**Quest Creation Component: `/src/app/quests/create/page.tsx`**
+```typescript
+'use client';
+
+import { useState } from 'react';
+import { createQuest } from '@/lib/api/quests';
+
+interface QuestCondition {
+  type: 'count' | 'value' | 'exists' | 'time_based';
+  eventType: string;
+  field?: string;
+  operator?: 'gte' | 'lte' | 'eq' | 'exists';
+  target: number | string | boolean;
+  filter?: Record<string, any>;
+}
+
+interface QuestConfig {
+  name: string;
+  description: string;
+  gameId: string;
+  startDate?: Date;
+  endDate?: Date;
+  ongoing: boolean;
+  conditions: QuestCondition[];
+  reward: {
+    type: 'token' | 'nft' | 'in_game' | 'webhook';
+    config: any;
+  };
+  gating: {
+    communities?: string[];
+    whitelist?: string[];
+    requiredQuests?: string[];
+    minLevel?: number;
+  };
+  repeatable: boolean;
+  cooldownHours?: number;
+}
+
+export default function CreateQuest() {
+  const [config, setConfig] = useState<QuestConfig>({
+    name: '',
+    description: '',
+    gameId: '',
+    ongoing: true,
+    conditions: [{
+      type: 'count',
+      eventType: 'ENEMY_KILL',
+      target: 10
+    }],
+    reward: {
+      type: 'in_game',
+      config: {}
+    },
+    gating: {},
+    repeatable: false
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      const quest = await createQuest(config);
+      window.location.href = `/quests/manage/${quest.id}`;
+    } catch (error) {
+      console.error('Failed to create quest:', error);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Basic Quest Info */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">Quest Details</h2>
+        
+        <div>
+          <label className="block text-sm font-medium">Quest Name</label>
+          <input
+            type="text"
+            value={config.name}
+            onChange={(e) => setConfig({...config, name: e.target.value})}
+            className="mt-1 block w-full rounded-md border-gray-300"
+            placeholder="e.g., Kill 10 Enemies"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">Description</label>
+          <textarea
+            value={config.description}
+            onChange={(e) => setConfig({...config, description: e.target.value})}
+            className="mt-1 block w-full rounded-md border-gray-300"
+            rows={3}
+            placeholder="Describe what players need to do..."
+          />
+        </div>
+      </div>
+
+      {/* Quest Conditions */}
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold">Quest Conditions</h2>
+          <button
+            type="button"
+            onClick={() => setConfig({
+              ...config,
+              conditions: [...config.conditions, {
+                type: 'count',
+                eventType: '',
+                target: 1
+              }]
+            })}
+            className="bg-blue-500 text-white px-3 py-1 rounded text-sm"
+          >
+            Add Condition
+          </button>
+        </div>
+
+        {config.conditions.map((condition, index) => (
+          <QuestConditionEditor
+            key={index}
+            condition={condition}
+            onChange={(newCondition) => {
+              const newConditions = [...config.conditions];
+              newConditions[index] = newCondition;
+              setConfig({...config, conditions: newConditions});
+            }}
+            onRemove={() => {
+              const newConditions = config.conditions.filter((_, i) => i !== index);
+              setConfig({...config, conditions: newConditions});
+            }}
+            canRemove={config.conditions.length > 1}
+          />
+        ))}
+      </div>
+
+      <button
+        type="submit"
+        className="w-full bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700"
+      >
+        Create Quest
+      </button>
+    </form>
+  );
+}
+```
+
+---
+
+## Battle Passes
+
+### 🎖️ Battle Pass System Implementation
+
+**Battle Pass Creation Component: `/src/app/battlepasses/create/page.tsx`**
+```typescript
+'use client';
+
+import { useState } from 'react';
+import { createBattlePass } from '@/lib/api/battlepasses';
+
+interface BattlePassTier {
+  tier: number;
+  xpRequired: number;
+  freeReward?: {
+    type: 'token' | 'nft' | 'in_game';
+    config: any;
+  };
+  premiumReward?: {
+    type: 'token' | 'nft' | 'in_game';
+    config: any;
+  };
+}
+
+interface XPSource {
+  eventType: string;
+  field?: string;
+  xpValue: number;
+  dailyLimit?: number;
+  filter?: Record<string, any>;
+}
+
+interface BattlePassConfig {
+  name: string;
+  description: string;
+  gameId: string;
+  startDate: Date;
+  endDate: Date;
+  entryRequirement: {
+    type: 'free' | 'purchase' | 'nft' | 'community';
+    config: any;
+  };
+  xpSources: XPSource[];
+  tiers: BattlePassTier[];
+  maxTier: number;
+  seasonTheme: string;
+  gating: {
+    communities?: string[];
+    requiredLevel?: number;
+  };
+}
+
+export default function CreateBattlePass() {
+  const [config, setConfig] = useState<BattlePassConfig>({
+    name: '',
+    description: '',
+    gameId: '',
+    startDate: new Date(),
+    endDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90 days
+    entryRequirement: {
+      type: 'free',
+      config: {}
+    },
+    xpSources: [{
+      eventType: 'MATCH_END',
+      field: 'score',
+      xpValue: 1,
+      dailyLimit: 1000
+    }],
+    tiers: [],
+    maxTier: 100,
+    seasonTheme: 'default',
+    gating: {}
+  });
+
+  const generateTiers = () => {
+    const tiers: BattlePassTier[] = [];
+    
+    for (let i = 1; i <= config.maxTier; i++) {
+      // XP requirement increases exponentially
+      const xpRequired = Math.floor(100 * Math.pow(1.1, i - 1));
+      
+      tiers.push({
+        tier: i,
+        xpRequired,
+        freeReward: i % 5 === 0 ? {
+          type: 'in_game',
+          config: { item: `tier_${i}_free_item` }
+        } : undefined,
+        premiumReward: {
+          type: 'in_game',
+          config: { item: `tier_${i}_premium_item` }
+        }
+      });
+    }
+    
+    setConfig({...config, tiers});
+  };
+
+  return (
+    <form className="space-y-8">
+      {/* Basic Info */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">Battle Pass Details</h2>
+        
+        <div>
+          <label className="block text-sm font-medium">Battle Pass Name</label>
+          <input
+            type="text"
+            value={config.name}
+            onChange={(e) => setConfig({...config, name: e.target.value})}
+            className="mt-1 block w-full rounded-md border-gray-300"
+            placeholder="e.g., Season 1: Cyber Warriors"
+            required
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium">Start Date</label>
+            <input
+              type="datetime-local"
+              value={config.startDate.toISOString().slice(0, 16)}
+              onChange={(e) => setConfig({...config, startDate: new Date(e.target.value)})}
+              className="mt-1 block w-full rounded-md border-gray-300"
+              required
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium">End Date</label>
+            <input
+              type="datetime-local"
+              value={config.endDate.toISOString().slice(0, 16)}
+              onChange={(e) => setConfig({...config, endDate: new Date(e.target.value)})}
+              className="mt-1 block w-full rounded-md border-gray-300"
+              required
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Tier Configuration */}
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold">Tier Configuration</h2>
+          <button
+            type="button"
+            onClick={generateTiers}
+            className="bg-purple-500 text-white px-3 py-1 rounded text-sm"
+          >
+            Generate {config.maxTier} Tiers
+          </button>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">Maximum Tier</label>
+          <input
+            type="number"
+            value={config.maxTier}
+            onChange={(e) => setConfig({...config, maxTier: Number(e.target.value)})}
+            className="mt-1 block w-full rounded-md border-gray-300"
+            min="10"
+            max="200"
+          />
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        className="w-full bg-purple-600 text-white py-3 px-4 rounded-md hover:bg-purple-700"
+      >
+        Create Battle Pass
+      </button>
+    </form>
+  );
+}
+```
+
+---
+
+## Communities & Referral System
+
+### 🏘️ Community System Implementation
+
+**Community Creation: `/src/app/communities/create/page.tsx`**
+```typescript
+'use client';
+
+import { useState } from 'react';
+import { createCommunity } from '@/lib/api/communities';
+
+interface CommunityConfig {
+  name: string;
+  description: string;
+  referralSlug: string;
+  redirectUrl: string;
+  isOpen: boolean;
+  memberMetadata: {
+    type: 'wallet' | 'email' | 'username' | 'discord' | 'custom';
+    requiredFields: string[];
+    validation?: {
+      pattern?: string;
+      minLength?: number;
+      maxLength?: number;
+    };
+  };
+  starterReward?: {
+    type: 'token' | 'nft' | 'in_game' | 'webhook';
+    config: any;
+  };
+  moderationSettings: {
+    autoApprove: boolean;
+    requireInvite: boolean;
+    maxMembers?: number;
+  };
+}
+
+export default function CreateCommunity() {
+  const [config, setConfig] = useState<CommunityConfig>({
+    name: '',
+    description: '',
+    referralSlug: '',
+    redirectUrl: '',
+    isOpen: true,
+    memberMetadata: {
+      type: 'wallet',
+      requiredFields: ['address']
+    },
+    moderationSettings: {
+      autoApprove: true,
+      requireInvite: false
+    }
+  });
+
+  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
+
+  const checkSlugAvailability = async (slug: string) => {
+    if (!slug) {
+      setSlugAvailable(null);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/communities/check-slug?slug=${slug}`);
+      const { available } = await response.json();
+      setSlugAvailable(available);
+    } catch (error) {
+      console.error('Error checking slug:', error);
+    }
+  };
+
+  const generateSlug = () => {
+    const slug = config.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+    
+    setConfig({...config, referralSlug: slug});
+    checkSlugAvailability(slug);
+  };
+
+  return (
+    <form className="space-y-6">
+      {/* Basic Community Info */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">Community Details</h2>
+        
+        <div>
+          <label className="block text-sm font-medium">Community Name</label>
+          <input
+            type="text"
+            value={config.name}
+            onChange={(e) => setConfig({...config, name: e.target.value})}
+            className="mt-1 block w-full rounded-md border-gray-300"
+            placeholder="e.g., Crypto Warriors Guild"
+            required
+          />
+        </div>
+      </div>
+
+      {/* Referral Configuration */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">Referral Link Setup</h2>
+        
+        <div>
+          <label className="block text-sm font-medium">Referral Slug</label>
+          <div className="mt-1 flex rounded-md shadow-sm">
+            <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+              ng.games/c/
+            </span>
+            <input
+              type="text"
+              value={config.referralSlug}
+              onChange={(e) => {
+                setConfig({...config, referralSlug: e.target.value});
+                checkSlugAvailability(e.target.value);
+              }}
+              className="flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-r-md border-gray-300"
+              placeholder="crypto-warriors"
+              required
+            />
+            <button
+              type="button"
+              onClick={generateSlug}
+              className="ml-2 px-3 py-2 bg-blue-500 text-white rounded text-sm"
+            >
+              Generate
+            </button>
+          </div>
+          
+          {slugAvailable === true && (
+            <p className="text-green-600 text-sm mt-1">✓ Slug available</p>
+          )}
+          {slugAvailable === false && (
+            <p className="text-red-600 text-sm mt-1">✗ Slug already taken</p>
+          )}
+          
+          <p className="text-gray-500 text-sm mt-1">
+            Full link: ng.games/c/{config.referralSlug}
+          </p>
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        disabled={!slugAvailable}
+        className="w-full bg-indigo-600 text-white py-3 px-4 rounded-md hover:bg-indigo-700 disabled:opacity-50"
+      >
+        Create Community
+      </button>
+    </form>
+  );
+}
+```
+
+---
+
+## 5. Plugin System & Game Engine Integration
+
+### 🔌 Universal Plugin Architecture
+
+**Plugin SDK (BoredGamer): `/public/sdk/boredgamer-sdk.js`**
+```javascript
+(function(global) {
+  'use strict';
+
+  class BoredGamerSDK {
+    constructor(config = {}) {
+      this.apiKey = config.apiKey;
+      this.gameId = config.gameId;
+      this.baseUrl = config.baseUrl || 'https://api.brightmatter.io';
+      this.userId = config.userId;
+      this.debug = config.debug || false;
+      
+      // Initialize event queue for offline support
+      this.eventQueue = [];
+      this.isOnline = navigator.onLine;
+      
+      // Set up network monitoring
+      window.addEventListener('online', () => {
+        this.isOnline = true;
+        this.flushEventQueue();
+      });
+      
+      window.addEventListener('offline', () => {
+        this.isOnline = false;
+      });
+    }
+
+    // Event Tracking
+    async track(eventType, data = {}) {
+      const event = {
+        gameId: this.gameId,
+        userId: this.userId,
+        eventType,
+        data,
+        timestamp: new Date().toISOString(),
+        source: 'web-sdk'
+      };
+
+      if (this.isOnline) {
+        return this.sendEvent(event);
+      } else {
+        this.eventQueue.push(event);
+        if (this.debug) console.log('Event queued (offline):', event);
+      }
+    }
+
+    async sendEvent(event) {
+      try {
+        const response = await fetch(`${this.baseUrl}/events`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.apiKey}`
+          },
+          body: JSON.stringify(event)
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        if (this.debug) console.log('Event sent successfully:', event);
+        return await response.json();
+      } catch (error) {
+        if (this.debug) console.error('Failed to send event:', error);
+        this.eventQueue.push(event); // Retry later
+        throw error;
+      }
+    }
+
+    // Plugin Management
+    async loadPlugin(type, id, containerId, options = {}) {
+      const container = document.getElementById(containerId);
+      if (!container) {
+        throw new Error(`Container ${containerId} not found`);
+      }
+
+      try {
+        const pluginData = await this.fetchPluginData(type, id);
+        const renderer = this.getRenderer(type);
+        
+        container.innerHTML = renderer(pluginData, options);
+        
+        // Set up auto-refresh if specified
+        if (options.autoRefresh) {
+          this.setupAutoRefresh(type, id, containerId, options);
+        }
+
+        return pluginData;
+      } catch (error) {
+        container.innerHTML = `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          Error loading ${type}: ${error.message}
+        </div>`;
+        throw error;
+      }
+    }
+
+    async fetchPluginData(type, id) {
+      const response = await fetch(`https://boredgamer.com/api/plugin/${type}?id=${id}&format=json`, {
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${type} data`);
+      }
+
+      return await response.json();
+    }
+
+    getRenderer(type) {
+      const renderers = {
+        leaderboard: this.renderLeaderboard.bind(this),
+        quest: this.renderQuest.bind(this),
+        tournament: this.renderTournament.bind(this),
+        battlepass: this.renderBattlePass.bind(this),
+        community: this.renderCommunity.bind(this)
+      };
+
+      return renderers[type] || this.renderDefault;
+    }
+
+    renderLeaderboard(data, options) {
+      const theme = options.theme || 'default';
+      const limit = options.limit || data.entries.length;
+      const showRank = options.showRank !== false;
+      
+      return `
+        <div class="boredgamer-leaderboard ${this.getThemeClass(theme)}" data-type="leaderboard" data-id="${data.id}">
+          <div class="bg-white rounded-lg shadow-md p-4">
+            <h3 class="text-lg font-bold mb-4 flex items-center">
+              🏆 ${data.name}
+              ${data.live ? '<span class="ml-2 text-xs bg-red-500 text-white px-2 py-1 rounded-full animate-pulse">LIVE</span>' : ''}
+            </h3>
+            
+            <div class="space-y-2">
+              ${data.entries.slice(0, limit).map((entry, index) => `
+                <div class="flex items-center justify-between p-3 ${index === 0 ? 'bg-yellow-50 border-2 border-yellow-200' : index === 1 ? 'bg-gray-50 border border-gray-200' : index === 2 ? 'bg-orange-50 border border-orange-200' : 'bg-gray-25 border border-gray-100'} rounded-lg transition-all hover:shadow-sm">
+                  <div class="flex items-center space-x-3">
+                    ${showRank ? `<div class="flex items-center justify-center w-8 h-8 rounded-full ${index === 0 ? 'bg-yellow-400 text-yellow-900' : index === 1 ? 'bg-gray-400 text-gray-900' : index === 2 ? 'bg-orange-400 text-orange-900' : 'bg-blue-100 text-blue-900'} font-bold text-sm">
+                      ${index < 3 ? ['🥇', '🥈', '🥉'][index] : index + 1}
+                    </div>` : ''}
+                    
+                    <div>
+                      <div class="font-medium text-gray-900">${this.formatUserId(entry.userId)}</div>
+                    </div>
+                  </div>
+                  
+                  <div class="text-right">
+                    <div class="font-mono font-bold text-lg ${index === 0 ? 'text-yellow-600' : 'text-gray-900'}">
+                      ${this.formatScore(entry.score)}
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Utility Methods
+    formatUserId(userId) {
+      if (userId.startsWith('0x') && userId.length === 42) {
+        return `${userId.slice(0, 6)}...${userId.slice(-4)}`;
+      }
+      return userId.length > 15 ? `${userId.slice(0, 12)}...` : userId;
+    }
+
+    formatScore(score) {
+      if (score >= 1000000) return `${(score / 1000000).toFixed(1)}M`;
+      if (score >= 1000) return `${(score / 1000).toFixed(1)}K`;
+      return score.toLocaleString();
+    }
+  }
+
+  // Export to global scope
+  global.BoredGamer = global.BoredGamer || {};
+  global.BoredGamer.SDK = BoredGamerSDK;
+  
+  // Convenience method for quick initialization
+  global.BoredGamer.init = function(config) {
+    global.BoredGamer.instance = new BoredGamerSDK(config);
+    return global.BoredGamer.instance;
+  };
+
+})(typeof window !== 'undefined' ? window : global);
+```
+
+**Unity Integration Package:**
+```csharp
+// Assets/BoredGamer/Scripts/BoredGamerManager.cs
+using UnityEngine;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine.Networking;
+using Newtonsoft.Json;
+
+namespace BoredGamer
+{
+    [System.Serializable]
+    public class BoredGamerConfig
+    {
+        public string apiKey;
+        public string gameId;
+        public string userId;
+        public string baseUrl = "https://api.brightmatter.io";
+        public bool enableDebugLogs = false;
+    }
+
+    public class BoredGamerManager : MonoBehaviour
+    {
+        [Header("Configuration")]
+        public BoredGamerConfig config;
+        
+        [Header("Auto-Initialize")]
+        public bool autoInitialize = true;
+
+        private Queue<GameEvent> eventQueue = new Queue<GameEvent>();
+        private bool isInitialized = false;
+
+        public static BoredGamerManager Instance { get; private set; }
+
+        void Awake()
+        {
+            // Singleton pattern
+            if (Instance == null)
+            {
+                Instance = this;
+                DontDestroyOnLoad(gameObject);
+                
+                if (autoInitialize)
+                {
+                    Initialize();
+                }
+            }
+            else
+            {
+                Destroy(gameObject);
+            }
+        }
+
+        public void Initialize()
+        {
+            if (isInitialized) return;
+
+            if (string.IsNullOrEmpty(config.apiKey) || string.IsNullOrEmpty(config.gameId))
+            {
+                Debug.LogError("BoredGamer: API Key and Game ID are required!");
+                return;
+            }
+
+            isInitialized = true;
+            
+            if (config.enableDebugLogs)
+            {
+                Debug.Log($"BoredGamer initialized for game: {config.gameId}");
+            }
+        }
+
+        public void TrackEvent(string eventType, Dictionary<string, object> data = null)
+        {
+            if (!isInitialized)
+            {
+                Debug.LogWarning("BoredGamer not initialized. Call Initialize() first.");
+                return;
+            }
+
+            var gameEvent = new GameEvent
+            {
+                gameId = config.gameId,
+                userId = config.userId,
+                eventType = eventType,
+                data = data ?? new Dictionary<string, object>(),
+                timestamp = DateTime.UtcNow.ToString("o")
+            };
+
+            eventQueue.Enqueue(gameEvent);
+
+            if (config.enableDebugLogs)
+            {
+                Debug.Log($"Event queued: {eventType}");
+            }
+        }
+
+        // Common event tracking methods
+        public void TrackMatchEnd(int score, int kills, float duration, string mode = null)
+        {
+            var data = new Dictionary<string, object>
+            {
+                ["score"] = score,
+                ["kills"] = kills,
+                ["duration"] = duration
+            };
+            
+            if (!string.IsNullOrEmpty(mode))
+                data["mode"] = mode;
+
+            TrackEvent("MATCH_END", data);
+        }
+
+        public void TrackEnemyKill(string enemyType, string weapon = null)
+        {
+            var data = new Dictionary<string, object>
+            {
+                ["enemy_type"] = enemyType
+            };
+            
+            if (!string.IsNullOrEmpty(weapon))
+                data["weapon"] = weapon;
+
+            TrackEvent("ENEMY_KILL", data);
+        }
+    }
+}
+```
+
+---
+
+## 6. Reward Fulfillment Architecture
+
+### 💰 Multi-Modal Reward System
+
+**BrightMatter Reward Processor: `brightmatter/src/processors/reward-processor.ts`**
+```typescript
+import { Consumer } from 'kafkajs';
+import { Pool } from 'pg';
+import { ethers } from 'ethers';
+import axios from 'axios';
+
+class RewardProcessor {
+  private consumer: Consumer;
+  private db: Pool;
+  private wallet: ethers.Wallet;
+  private provider: ethers.JsonRpcProvider;
+
+  constructor(db: Pool) {
+    this.db = db;
+    const kafka = createKafkaClient();
+    this.consumer = kafka.consumer({ groupId: 'reward-processor' });
+    
+    // Initialize Web3 components
+    this.initializeWeb3();
+  }
+
+  private initializeWeb3() {
+    // Initialize provider (use your preferred RPC)
+    this.provider = new ethers.JsonRpcProvider(process.env.RPC_URL || 'https://polygon-rpc.com');
+    
+    // Initialize wallet for reward transactions
+    if (process.env.REWARD_WALLET_PRIVATE_KEY) {
+      this.wallet = new ethers.Wallet(process.env.REWARD_WALLET_PRIVATE_KEY, this.provider);
+    }
+  }
+
+  async start() {
+    await this.consumer.subscribe({ 
+      topics: ['reward.events'] 
+    });
+
+    await this.consumer.run({
+      eachMessage: async ({ message }) => {
+        const event = JSON.parse(message.value!.toString());
+        await this.handleRewardEvent(event);
+      }
+    });
+  }
+
+  private async handleRewardEvent(event: any) {
+    // Create fulfillment record
+    const fulfillmentId = await this.createFulfillmentRecord(event);
+    
+    try {
+      // Update status to processing
+      await this.updateFulfillmentStatus(fulfillmentId, 'processing');
+
+      // Route to appropriate fulfillment method
+      switch (event.rewardType) {
+        case 'token':
+          await this.fulfillTokenReward(fulfillmentId, event);
+          break;
+        case 'nft':
+          await this.fulfillNFTReward(fulfillmentId, event);
+          break;
+        case 'in_game':
+          await this.fulfillInGameReward(fulfillmentId, event);
+          break;
+        case 'webhook':
+          await this.fulfillWebhookReward(fulfillmentId, event);
+          break;
+        default:
+          throw new Error(`Unknown reward type: ${event.rewardType}`);
+      }
+
+      // Update status to completed
+      await this.updateFulfillmentStatus(fulfillmentId, 'completed');
+      
+      // Emit completion event
+      await this.emitRewardStatusUpdate(fulfillmentId, 'completed', event);
+
+    } catch (error) {
+      console.error(`Reward fulfillment failed:`, error);
+      
+      await this.updateFulfillmentStatus(
+        fulfillmentId, 
+        'failed', 
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+      
+      await this.emitRewardStatusUpdate(fulfillmentId, 'failed', event, error.message);
+    }
+  }
+
+  // Token Reward Fulfillment (ERC-20)
+  private async fulfillTokenReward(fulfillmentId: string, event: any) {
+    const { amount, tokenAddress, decimals = 18 } = event.rewardConfig;
+    
+    if (!this.wallet) {
+      throw new Error('Wallet not configured for token rewards');
+    }
+
+    // Validate recipient address
+    if (!ethers.isAddress(event.userId)) {
+      throw new Error(`Invalid recipient address: ${event.userId}`);
+    }
+
+    // Create token contract instance
+    const tokenContract = new ethers.Contract(
+      tokenAddress,
+      [
+        'function transfer(address to, uint256 amount) returns (bool)',
+        'function balanceOf(address account) view returns (uint256)'
+      ],
+      this.wallet
+    );
+
+    // Calculate amount with decimals
+    const transferAmount = ethers.parseUnits(amount.toString(), decimals);
+
+    // Check wallet balance
+    const balance = await tokenContract.balanceOf(this.wallet.address);
+    if (balance < transferAmount) {
+      throw new Error(`Insufficient token balance. Required: ${transferAmount}, Available: ${balance}`);
+    }
+
+    // Execute transfer
+    const tx = await tokenContract.transfer(event.userId, transferAmount);
+    console.log(`Token transfer initiated: ${tx.hash}`);
+
+    // Wait for confirmation
+    const receipt = await tx.wait();
+    if (receipt.status !== 1) {
+      throw new Error(`Transaction failed: ${tx.hash}`);
+    }
+
+    // Update fulfillment with transaction details
+    await this.updateFulfillmentStatus(
+      fulfillmentId,
+      'completed',
+      undefined,
+      tx.hash,
+      {
+        tokenAddress,
+        amount: transferAmount.toString(),
+        recipient: event.userId,
+        blockNumber: receipt.blockNumber,
+        gasUsed: receipt.gasUsed.toString()
+      }
+    );
+
+    console.log(`Token reward fulfilled: ${amount} tokens to ${event.userId}`);
+  }
+
+  // In-Game Reward Fulfillment
+  private async fulfillInGameReward(fulfillmentId: string, event: any) {
+    const { item, quantity = 1, webhookUrl } = event.rewardConfig;
+    
+    // Get game configuration for webhook URL
+    const gameQuery = `SELECT webhook_url FROM games WHERE id = $1`;
+    const gameResult = await this.db.query(gameQuery, [event.campaignId]);
+    
+    if (gameResult.rows.length === 0) {
+      throw new Error('Game configuration not found');
+    }
+
+    const targetUrl = webhookUrl || gameResult.rows[0].webhook_url;
+    
+    if (!targetUrl) {
+      throw new Error('No webhook URL configured for in-game rewards');
+    }
+
+    // Prepare reward payload
+    const payload = {
+      userId: event.userId,
+      rewardType: 'in_game',
+      reward: {
+        item,
+        quantity,
+        source: 'boredgamer',
+        campaignId: event.campaignId,
+        timestamp: event.timestamp
+      },
+      metadata: {
+        fulfillmentId
+      }
+    };
+
+    // Send webhook request
+    const response = await axios.post(targetUrl, payload, {
+      timeout: 30000,
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'BoredGamer-RewardProcessor/1.0'
+      }
+    });
+
+    await this.updateFulfillmentStatus(
+      fulfillmentId,
+      'completed',
+      undefined,
+      undefined,
+      {
+        webhookUrl: targetUrl,
+        payload,
+        response: {
+          status: response.status,
+          data: response.data
+        }
+      }
+    );
+
+    console.log(`In-game reward fulfilled: ${item} x${quantity} to ${event.userId}`);
+  }
+
+  private async createFulfillmentRecord(event: any): Promise<string> {
+    const fulfillmentId = crypto.randomUUID();
+    
+    const query = `
+      INSERT INTO reward_fulfillments (
+        id, campaign_id, user_id, reward_type, reward_config, 
+        status, created_at
+      ) VALUES ($1, $2, $3, $4, $5, 'pending', NOW())
+    `;
+
+    await this.db.query(query, [
+      fulfillmentId,
+      event.campaignId,
+      event.userId,
+      event.rewardType,
+      JSON.stringify(event.rewardConfig)
+    ]);
+
+    return fulfillmentId;
+  }
+
+  private async updateFulfillmentStatus(
+    fulfillmentId: string, 
+    status: string, 
+    errorMessage?: string,
+    transactionHash?: string,
+    fulfillmentData?: any
+  ) {
+    const query = `
+      UPDATE reward_fulfillments 
+      SET status = $2, 
+          error_message = $3,
+          transaction_hash = $4,
+          fulfillment_data = $5,
+          completed_at = CASE WHEN $2 IN ('completed', 'failed') THEN NOW() ELSE completed_at END
+      WHERE id = $1
+    `;
+
+    await this.db.query(query, [
+      fulfillmentId,
+      status,
+      errorMessage || null,
+      transactionHash || null,
+      fulfillmentData ? JSON.stringify(fulfillmentData) : null
+    ]);
+  }
+
+  private async emitRewardStatusUpdate(
+    fulfillmentId: string, 
+    status: string, 
+    event: any, 
+    errorMessage?: string
+  ) {
+    const statusEvent = {
+      type: 'REWARD_STATUS_UPDATE',
+      fulfillmentId,
+      campaignId: event.campaignId,
+      userId: event.userId,
+      rewardType: event.rewardType,
+      status,
+      errorMessage,
+      timestamp: new Date().toISOString()
+    };
+
+    const kafka = createKafkaClient();
+    const producer = kafka.producer();
+    
+    await producer.send({
+      topic: 'reward.status',
+      messages: [{
+        key: `${event.userId}-${fulfillmentId}`,
+        value: JSON.stringify(statusEvent)
+      }]
+    });
+
+    await producer.disconnect();
+  }
+}
+
+export default RewardProcessor;
+```
+
+---
+
+## 7. Real-time Updates & WebSocket Implementation
+
+### ⚡ Live Dashboard Updates
+
+**WebSocket Server (BoredGamer): `/src/lib/websocket-server.ts`**
+```typescript
+import { Server as SocketIOServer } from 'socket.io';
+import { createServer } from 'http';
+import { validateFirebaseToken } from './firebase-admin';
+import { createKafkaClient } from './kafka-client';
+
+class WebSocketManager {
+  private io: SocketIOServer;
+  private kafkaConsumer: any;
+  private connectedUsers: Map<string, Set<string>> = new Map(); // userId -> socketIds
+
+  constructor(server: any) {
+    this.io = new SocketIOServer(server, {
+      cors: {
+        origin: process.env.FRONTEND_URL || "http://localhost:3000",
+        methods: ["GET", "POST"]
+      },
+      path: '/api/socketio'
+    });
+
+    this.setupAuthentication();
+    this.setupEventHandlers();
+    this.initializeKafkaConsumer();
+  }
+
+  private setupAuthentication() {
+    this.io.use(async (socket: any, next) => {
+      try {
+        const token = socket.handshake.auth.token;
+        
+        if (!token) {
+          return next(new Error('Authentication token required'));
+        }
+
+        const user = await validateFirebaseToken(token);
+        socket.userId = user.uid;
+        socket.userRole = user.role;
+        socket.subscribedChannels = new Set();
+
+        console.log(`User ${user.uid} connected via WebSocket`);
+        next();
+      } catch (error) {
+        console.error('WebSocket authentication failed:', error);
+        next(new Error('Authentication failed'));
+      }
+    });
+  }
+
+  private setupEventHandlers() {
+    this.io.on('connection', (socket: any) => {
+      const userId = socket.userId!;
+      
+      // Track connected users
+      if (!this.connectedUsers.has(userId)) {
+        this.connectedUsers.set(userId, new Set());
+      }
+      this.connectedUsers.get(userId)!.add(socket.id);
+
+      // Handle channel subscriptions
+      socket.on('subscribe', (data: { channels: string[] }) => {
+        for (const channel of data.channels) {
+          socket.join(channel);
+          socket.subscribedChannels!.add(channel);
+        }
+      });
+
+      // Handle real-time campaign updates
+      socket.on('subscribe_campaign', (data: { campaignId: string; type: string }) => {
+        const channel = `campaign:${data.campaignId}`;
+        socket.join(channel);
+        socket.subscribedChannels!.add(channel);
+      });
+
+      // Handle user-specific subscriptions
+      socket.on('subscribe_user_updates', () => {
+        const channel = `user:${userId}`;
+        socket.join(channel);
+        socket.subscribedChannels!.add(channel);
+      });
+
+      // Handle disconnection
+      socket.on('disconnect', () => {
+        const userSockets = this.connectedUsers.get(userId);
+        if (userSockets) {
+          userSockets.delete(socket.id);
+          if (userSockets.size === 0) {
+            this.connectedUsers.delete(userId);
+          }
+        }
+      });
+
+      // Send initial connection confirmation
+      socket.emit('connected', {
+        userId,
+        timestamp: new Date().toISOString(),
+        channels: Array.from(socket.subscribedChannels!)
+      });
+    });
+  }
+
+  private async initializeKafkaConsumer() {
+    const kafka = createKafkaClient();
+    this.kafkaConsumer = kafka.consumer({ groupId: 'websocket-consumer' });
+
+    await this.kafkaConsumer.subscribe({
+      topics: [
+        'ui.leaderboard_refresh',
+        'ui.tournament_updates',
+        'ui.quest_updates',
+        'ui.battlepass_updates',
+        'ui.community_updates',
+        'ui.reward_updates'
+      ]
+    });
+
+    await this.kafkaConsumer.run({
+      eachMessage: async ({ topic, message }: any) => {
+        const event = JSON.parse(message.value.toString());
+        await this.handleKafkaEvent(topic, event);
+      }
+    });
+  }
+
+  private async handleKafkaEvent(topic: string, event: any) {
+    switch (topic) {
+      case 'ui.leaderboard_refresh':
+        this.handleLeaderboardUpdate(event);
+        break;
+      
+      case 'ui.quest_updates':
+        this.handleQuestUpdate(event);
+        break;
+      
+      case 'ui.reward_updates':
+        this.handleRewardUpdate(event);
+        break;
+    }
+  }
+
+  private handleLeaderboardUpdate(event: any) {
+    const { campaignId } = event;
+    
+    // Broadcast to campaign-specific channel
+    this.io.to(`campaign:${campaignId}`).emit('leaderboard_update', {
+      type: 'LEADERBOARD_UPDATE',
+      campaignId,
+      timestamp: event.timestamp
+    });
+  }
+
+  private handleQuestUpdate(event: any) {
+    const { questId, userId, completed } = event;
+    
+    // Send user-specific quest progress update
+    this.io.to(`user:${userId}`).emit('quest_progress', {
+      questId,
+      progress: event.conditions,
+      completed,
+      timestamp: event.timestamp
+    });
+
+    // If quest completed, send notification
+    if (completed) {
+      this.io.to(`user:${userId}`).emit('quest_completed', {
+        questId,
+        reward: event.reward,
+        timestamp: event.timestamp
+      });
+    }
+  }
+
+  private handleRewardUpdate(event: any) {
+    const { userId, status, rewardType } = event;
+    
+    // Send reward notification to user
+    this.io.to(`user:${userId}`).emit('reward_notification', {
+      type: 'REWARD_STATUS',
+      status,
+      rewardType,
+      message: this.getRewardMessage(status, rewardType),
+      timestamp: event.timestamp
+    });
+  }
+
+  private getRewardMessage(status: string, rewardType: string): string {
+    const rewardName = rewardType === 'token' ? 'tokens' : 
+                     rewardType === 'nft' ? 'NFT' : 
+                     rewardType === 'in_game' ? 'in-game item' : 'reward';
+
+    switch (status) {
+      case 'completed':
+        return `🎁 Your ${rewardName} has been delivered!`;
+      case 'processing':
+        return `⏳ Your ${rewardName} is being processed...`;
+      case 'failed':
+        return `❌ Failed to deliver your ${rewardName}. Please contact support.`;
+      default:
+        return `Reward update: ${status}`;
+    }
+  }
+}
+
+export default WebSocketManager;
+```
+
+---
+
+## 8. Error Handling & Monitoring
+
+### 🔍 Comprehensive Error Management
+
+**Error Handling Middleware (BrightMatter): `brightmatter/src/middleware/error-handler.ts`**
+```typescript
+import { Request, Response, NextFunction } from 'express';
+import { Pool } from 'pg';
+import { createKafkaClient } from '../config/kafka';
+
+class ErrorHandler {
+  private db: Pool;
+  private kafkaProducer: any;
+
+  constructor(db: Pool) {
+    this.db = db;
+    this.initializeKafka();
+  }
+
+  private async initializeKafka() {
+    const kafka = createKafkaClient();
+    this.kafkaProducer = kafka.producer();
+    await this.kafkaProducer.connect();
+  }
+
+  async logError(error: Error, context: any = {}, userId?: string) {
+    const errorLog = {
+      id: crypto.randomUUID(),
+      service: 'brightmatter',
+      error_type: error.constructor.name,
+      error_message: error.message,
+      stack_trace: error.stack,
+      context,
+      user_id: userId,
+      request_id: context.requestId,
+      created_at: new Date()
+    };
+
+    try {
+      // Log to database
+      await this.saveErrorToDatabase(errorLog);
+      
+      // Send to monitoring topic
+      await this.sendErrorToKafka(errorLog);
+      
+      // Send alerts for critical errors
+      if (this.isCriticalError(error)) {
+        await this.sendCriticalAlert(errorLog);
+      }
+
+    } catch (loggingError) {
+      console.error('Failed to log error:', loggingError);
+    }
+  }
+
+  private async saveErrorToDatabase(errorLog: any) {
+    const query = `
+      INSERT INTO error_logs (
+        id, service, error_type, error_message, stack_trace, 
+        context, user_id, request_id, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `;
+
+    await this.db.query(query, [
+      errorLog.id,
+      errorLog.service,
+      errorLog.error_type,
+      errorLog.error_message,
+      errorLog.stack_trace,
+      JSON.stringify(errorLog.context),
+      errorLog.user_id,
+      errorLog.request_id,
+      errorLog.created_at
+    ]);
+  }
+
+  private isCriticalError(error: Error): boolean {
+    const criticalPatterns = [
+      /database/i,
+      /kafka/i,
+      /authentication/i,
+      /payment/i,
+      /reward.*fulfillment/i
+    ];
+
+    return criticalPatterns.some(pattern => 
+      pattern.test(error.message) || pattern.test(error.constructor.name)
+    );
+  }
+
+  // Express middleware
+  handleExpressError() {
+    return async (error: Error, req: Request, res: Response, next: NextFunction) => {
+      const context = {
+        requestId: req.headers['x-request-id'] || crypto.randomUUID(),
+        method: req.method,
+        url: req.url,
+        userAgent: req.headers['user-agent'],
+        ip: req.ip
+      };
+
+      const userId = (req as any).user?.uid;
+      await this.logError(error, context, userId);
+
+      // Send appropriate error response
+      if (error.name === 'ValidationError') {
+        res.status(400).json({
+          error: 'Validation failed',
+          message: error.message,
+          requestId: context.requestId
+        });
+      } else {
+        res.status(500).json({
+          error: 'Internal server error',
+          message: 'An unexpected error occurred',
+          requestId: context.requestId
+        });
+      }
+    };
+  }
+}
+
+export default ErrorHandler;
+```
+
+---
+
+## 9. Implementation Roadmap
+
+### 🗺️ Phased Development Plan
+
+**Phase 1: Core Infrastructure (Weeks 1-3)**
+```markdown
+## Week 1: Foundation Setup
+- [ ] BrightMatter ECS services deployment
+- [ ] PostgreSQL schema implementation
+- [ ] Redpanda topic configuration
+- [ ] Firebase Auth integration
+- [ ] Basic API routes in BoredGamer
+
+## Week 2: Event Processing
+- [ ] Game event ingestion endpoint
+- [ ] Basic event processor framework
+- [ ] Database event storage
+- [ ] Event validation and normalization
+
+## Week 3: Authentication & Security
+- [ ] Firebase token validation middleware
+- [ ] Role-based access control
+- [ ] API rate limiting
+- [ ] Error handling and logging
+```
+
+**Phase 2: Core Features (Weeks 4-8)**
+```markdown
+## Week 4: Leaderboards
+- [ ] Leaderboard creation UI
+- [ ] Leaderboard processor implementation
+- [ ] Real-time score updates
+- [ ] Plugin generation system
+
+## Week 5: Quests
+- [ ] Quest creation and management UI
+- [ ] Quest condition evaluation engine
+- [ ] Progress tracking system
+- [ ] Quest completion notifications
+
+## Week 6: Tournaments
+- [ ] Tournament creation and scheduling
+- [ ] Tournament leaderboard system
+- [ ] Prize distribution logic
+- [ ] Tournament end automation
+
+## Week 7: Communities
+- [ ] Community creation and management
+- [ ] Referral link system (ng.games)
+- [ ] Member verification
+- [ ] Community gating implementation
+
+## Week 8: Integration Testing
+- [ ] End-to-end testing suite
+- [ ] Game engine integration testing
+- [ ] Load testing with simulated events
+- [ ] Performance optimization
+```
+
+**Phase 3: Advanced Features (Weeks 9-12)**
+```markdown
+## Week 9: Battle Pass System
+- [ ] Battle pass creation UI
+- [ ] XP tracking and tier calculation
+- [ ] Reward claiming system
+- [ ] Premium purchase flow
+
+## Week 10: Reward Fulfillment
+- [ ] On-chain reward processor
+- [ ] In-game webhook system
+- [ ] NFT minting and distribution
+- [ ] Token transfer automation
+
+## Week 11: Real-time Features
+- [ ] WebSocket server implementation
+- [ ] Live dashboard updates
+- [ ] Real-time notifications
+- [ ] Plugin auto-refresh
+
+## Week 12: Monitoring & Optimization
+- [ ] Comprehensive monitoring setup
+- [ ] Performance metrics dashboard
+- [ ] Error tracking and analysis
+- [ ] Scalability improvements
+```
+
+---
+
+## 10. Deployment & Infrastructure
+
+### 🚀 Production Architecture
+
+**AWS Infrastructure Setup (Terraform)**
+```hcl
+# terraform/main.tf
+provider "aws" {
+  region = var.aws_region
+}
+
+# VPC and Networking
+resource "aws_vpc" "main" {
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+
+  tags = {
+    Name = "boredgamer-vpc"
+  }
+}
+
+# RDS PostgreSQL
+resource "aws_db_instance" "postgres" {
+  identifier     = "boredgamer-postgres"
+  engine         = "postgres"
+  engine_version = "15.4"
+  instance_class = "db.t3.large"
+  
+  allocated_storage     = 100
+  max_allocated_storage = 1000
+  storage_type          = "gp3"
+  storage_encrypted     = true
+  
+  db_name  = "boredgamer"
+  username = var.db_username
+  password = var.db_password
+  
+  backup_retention_period = 7
+  backup_window          = "03:00-04:00"
+  maintenance_window     = "sun:04:00-sun:05:00"
+  
+  skip_final_snapshot = false
+  
+  performance_insights_enabled = true
+  monitoring_interval         = 60
+
+  tags = {
+    Name = "boredgamer-postgres"
+  }
+}
+
+# ECS Cluster
+resource "aws_ecs_cluster" "main" {
+  name = "boredgamer-cluster"
+
+  setting {
+    name  = "containerInsights"
+    value = "enabled"
+  }
+}
+
+# ECS Task Definitions and Services
+resource "aws_ecs_task_definition" "brightmatter_api" {
+  family                   = "brightmatter-api"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = 1024
+  memory                   = 2048
+
+  execution_role_arn = aws_iam_role.ecs_execution.arn
+  task_role_arn      = aws_iam_role.ecs_task.arn
+
+  container_definitions = jsonencode([
+    {
+      name  = "brightmatter-api"
+      image = "${aws_ecr_repository.brightmatter.repository_url}:latest"
+      
+      portMappings = [
+        {
+          containerPort = 3000
+          protocol      = "tcp"
+        }
+      ]
+      
+      environment = [
+        {
+          name  = "NODE_ENV"
+          value = "production"
+        }
+      ]
+      
+      secrets = [
+        {
+          name      = "DB_PASSWORD"
+          valueFrom = aws_ssm_parameter.db_password.arn
+        }
+      ]
+      
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.brightmatter_api.name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "ecs"
+        }
+      }
+    }
+  ])
+}
+
+# Auto Scaling
+resource "aws_appautoscaling_target" "brightmatter_api" {
+  max_capacity       = 10
+  min_capacity       = 3
+  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.brightmatter_api.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+}
+
+# CloudWatch Monitoring
+resource "aws_cloudwatch_log_group" "brightmatter_api" {
+  name              = "/ecs/brightmatter-api"
+  retention_in_days = 30
+}
+
+# CloudWatch Alarms
+resource "aws_cloudwatch_metric_alarm" "high_cpu" {
+  alarm_name          = "brightmatter-api-high-cpu"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/ECS"
+  period              = "300"
+  statistic           = "Average"
+  threshold           = "80"
+  alarm_description   = "This metric monitors ecs cpu utilization"
+
+  dimensions = {
+    ServiceName = aws_ecs_service.brightmatter_api.name
+    ClusterName = aws_ecs_cluster.main.name
+  }
+}
+```
+
+**CI/CD Pipeline (GitHub Actions):**
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run tests
+      run: npm test
+
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+    
+    - name: Build, tag, and push image to Amazon ECR
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: boredgamer/brightmatter
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -f Dockerfile.brightmatter -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+    - name: Deploy to ECS
+      run: |
+        aws ecs update-service \
+          --cluster boredgamer-cluster \
+          --service brightmatter-api \
+          --force-new-deployment
+```
+
+---
+
+## Conclusion
+
+This comprehensive implementation document provides a complete technical roadmap for integrating BoredGamer with BrightMatter. The architecture addresses all key requirements:
+
+**✅ Scalable Event Processing**: Redpanda handles high-throughput game events with real-time processing  
+**✅ Modular Campaign System**: Leaderboards, quests, tournaments, and battle passes with unified architecture  
+**✅ Community Management**: Complete referral system with gating and reward automation  
+**✅ Multi-Modal Rewards**: On-chain, in-game, and webhook fulfillment with comprehensive error handling  
+**✅ Real-time Updates**: WebSocket integration for live dashboard and plugin updates  
+**✅ Game Engine Support**: Unity, Unreal, and web SDKs with plugin ecosystem  
+**✅ Production Ready**: Full CI/CD, monitoring, error handling, and scalability considerations
+
+The phased implementation approach ensures manageable development cycles while maintaining system reliability. Each component is designed to be independently deployable and scalable, allowing for rapid iteration and feature expansion.
+
+The modular architecture future-proofs the platform for advanced features like AI-powered recommendations, cross-game campaigns, and enterprise white-label solutions while maintaining the core value proposition of seamless game data integration and player engagement.
