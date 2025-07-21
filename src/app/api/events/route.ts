@@ -1,126 +1,173 @@
-import { NextResponse } from 'next/server';
-export const runtime = 'nodejs';
+import { NextRequest, NextResponse } from 'next/server';
+import { getFirestore, collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { app } from '@/lib/firebase';
 
-export async function POST(request: Request) {
+const db = getFirestore(app);
+
+interface GameEvent {
+  gameId: string;
+  studioId: string;
+  userId: string;
+  type: string;
+  data: any;
+  timestamp?: any;
+  metadata?: {
+    sdkVersion?: string;
+    platform?: string;
+    sessionId?: string;
+  };
+}
+
+export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { gameId, studioId, type, data, metadata } = body;
+    const event: GameEvent = await request.json();
 
     // Validate required fields
-    if (!gameId || !studioId || !type) {
-      return NextResponse.json(
-        { error: 'Missing required fields: gameId, studioId, type' },
-        { status: 400 }
-      );
+    if (!event.gameId || !event.studioId || !event.userId || !event.type) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Missing required fields: gameId, studioId, userId, type' 
+      }, { status: 400 });
     }
 
-    // Validate API key from headers
-    const apiKey = request.headers.get('X-API-Key') || request.headers.get('Authorization')?.replace('Bearer ', '');
-
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'Missing API key' },
-        { status: 401 }
-      );
-    }
-
-    // TODO: Validate API key against database
-    // For now, we'll accept any key starting with 'bg_'
-    if (!apiKey.startsWith('bg_')) {
-      return NextResponse.json(
-        { error: 'Invalid API key format' },
-        { status: 401 }
-      );
-    }
-
-    // Create event object with proper structure
-    const event = {
-      gameId,
-      studioId,
-      type,
-      data: data || {},
+    // Add timestamp and processing metadata
+    const eventData = {
+      ...event,
+      timestamp: serverTimestamp(),
+      processed: false,
+      receivedAt: new Date().toISOString(),
       metadata: {
-        sdkVersion: metadata?.sdkVersion || '1.0.0',
-        platform: metadata?.platform || 'unknown',
-        timestamp: new Date().toISOString(),
-        apiKey: apiKey.substring(0, 12) + '...', // Log partial key for debugging
-        ...metadata
-      },
-      timestamp: new Date(),
-      processed: false
+        sdkVersion: '1.0.0',
+        platform: 'web',
+        ...event.metadata
+      }
     };
 
-    // Store in Firebase
-    const { db } = await import('@/lib/firebase-admin');
-    const docRef = await db.collection('events').add(event);
+    // Store event in Firestore
+    const eventsRef = collection(db, 'events');
+    const docRef = await addDoc(eventsRef, eventData);
 
-    // Log for monitoring
-    console.log(`Event received: ${type} for game ${gameId}`, {
-      eventId: docRef.id,
-      studioId,
-      timestamp: event.timestamp
-    });
+    // Process event for quests, leaderboards, etc.
+    await processEventForCampaigns(eventData);
 
-    return NextResponse.json({
-      success: true,
+    return NextResponse.json({ 
+      success: true, 
       eventId: docRef.id,
-      message: 'Event received successfully'
+      timestamp: eventData.receivedAt
     });
 
   } catch (error) {
-    console.error('Error processing event:', error);
-    return NextResponse.json(
-      { 
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
+    console.error('Error storing event:', error);
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Failed to store event' 
+    }, { status: 500 });
   }
 }
 
-export async function GET(request: Request) {
+async function processEventForCampaigns(event: GameEvent) {
   try {
-    const { searchParams } = new URL(request.url);
-    const gameId = searchParams.get('gameId');
-    const studioId = searchParams.get('studioId');
-    const limit = parseInt(searchParams.get('limit') || '100');
-
-    if (!studioId) {
-      return NextResponse.json(
-        { error: 'Missing studioId parameter' },
-        { status: 400 }
-      );
-    }
-
-    const { db } = await import('@/lib/firebase-admin');
-    let query = db.collection('events').where('studioId', '==', studioId);
-
-    if (gameId) {
-      query = query.where('gameId', '==', gameId);
-    }
-
-    const snapshot = await query
-      .orderBy('timestamp', 'desc')
-      .limit(limit)
-      .get();
-
-    const events = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-
-    return NextResponse.json({
-      events,
-      count: events.length,
-      hasMore: events.length === limit
-    });
-
-  } catch (error) {
-    console.error('Error fetching events:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+    // Find relevant campaigns (quests, leaderboards, etc.)
+    const campaignsRef = collection(db, 'campaigns');
+    const q = query(
+      campaignsRef, 
+      where('gameId', '==', event.gameId),
+      where('status', '==', 'active')
     );
+
+    const snapshot = await getDocs(q);
+
+    for (const doc of snapshot.docs) {
+      const campaign = doc.data();
+
+      switch (campaign.type) {
+        case 'quest':
+          await processQuestEvent(doc.id, campaign, event);
+          break;
+        case 'leaderboard':
+          await processLeaderboardEvent(doc.id, campaign, event);
+          break;
+        case 'tournament':
+          await processTournamentEvent(doc.id, campaign, event);
+          break;
+        case 'battlepass':
+          await processBattlePassEvent(doc.id, campaign, event);
+          break;
+      }
+    }
+  } catch (error) {
+    console.error('Error processing event for campaigns:', error);
   }
+}
+
+async function processQuestEvent(campaignId: string, campaign: any, event: GameEvent) {
+  // Check if event matches quest conditions
+  const conditions = campaign.conditions || [];
+
+  for (const condition of conditions) {
+    if (condition.eventType === event.type) {
+      // Update quest progress
+      await updateQuestProgress(campaignId, event.userId, condition, event.data);
+    }
+  }
+}
+
+async function processLeaderboardEvent(campaignId: string, campaign: any, event: GameEvent) {
+  const scoringConfig = campaign.scoringMetadata;
+
+  if (scoringConfig && scoringConfig.eventType === event.type) {
+    const score = extractScoreFromEvent(event.data, scoringConfig);
+    if (score !== null) {
+      await updateLeaderboardScore(campaignId, event.userId, score);
+    }
+  }
+}
+
+async function processTournamentEvent(campaignId: string, campaign: any, event: GameEvent) {
+  // Similar to leaderboard but with tournament-specific logic
+  await processLeaderboardEvent(campaignId, campaign, event);
+}
+
+async function processBattlePassEvent(campaignId: string, campaign: any, event: GameEvent) {
+  const xpSources = campaign.xpSources || [];
+
+  for (const source of xpSources) {
+    if (source.eventType === event.type) {
+      const xp = calculateXP(event.data, source);
+      if (xp > 0) {
+        await updateBattlePassXP(campaignId, event.userId, xp);
+      }
+    }
+  }
+}
+
+async function updateQuestProgress(campaignId: string, userId: string, condition: any, eventData: any) {
+  // Implementation for quest progress tracking
+  // This would update the user_progress collection
+}
+
+async function updateLeaderboardScore(campaignId: string, userId: string, score: number) {
+  // Implementation for leaderboard score updates
+  // This would update the leaderboard_entries collection
+}
+
+async function updateBattlePassXP(campaignId: string, userId: string, xp: number) {
+  // Implementation for battle pass XP updates
+  // This would update the battlepass_progress collection
+}
+
+function extractScoreFromEvent(data: any, config: any): number | null {
+  try {
+    const value = config.dataField.split('.').reduce((obj: any, key: string) => obj?.[key], data);
+    return typeof value === 'number' ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function calculateXP(data: any, source: any): number {
+  const baseValue = source.field ? 
+    source.field.split('.').reduce((obj: any, key: string) => obj?.[key], data) : 1;
+
+  return (typeof baseValue === 'number' ? baseValue : 1) * source.xpValue;
 }

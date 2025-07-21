@@ -105,12 +105,12 @@ export default function QuestDashboard() {
   const filteredQuests = useMemo(() => {
     const now = new Date();
     console.log('Current time:', now.toISOString());
-    
+
     // First filter quests based on tab
     const filtered = quests.filter(quest => {
       const startDate = new Date(quest.startDate);
       const endDate = new Date(quest.endDate);
-      
+
       console.log('Quest:', quest.name);
       console.log('Start date:', startDate.toISOString());
       console.log('End date:', endDate.toISOString());
@@ -137,7 +137,7 @@ export default function QuestDashboard() {
     return filtered.sort((a, b) => {
       const aStart = new Date(a.startDate).getTime();
       const bStart = new Date(b.startDate).getTime();
-      
+
       switch (manageTab) {
         case 'previous':
           // Sort by end date, most recent first
@@ -162,7 +162,7 @@ export default function QuestDashboard() {
       questsRef, 
       where('studioId', '==', user.id)
     );
-    
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const questsData = snapshot.docs.map(doc => {
         const data = doc.data();
@@ -201,7 +201,7 @@ export default function QuestDashboard() {
   // Load analytics
   const loadAnalytics = async (timeframe = '7d') => {
     if (!user?.id) return;
-    
+
     setLoadingAnalytics(true);
     try {
       const response = await fetch(`/api/quests/analytics?studioId=${user.id}&timeframe=${timeframe}`);
@@ -223,7 +223,7 @@ export default function QuestDashboard() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!user) {
       console.error('No user found');
       return;
@@ -613,7 +613,7 @@ export default function QuestDashboard() {
                     </div>
                   </div>
                 ))}
-                
+
                 {selectedTemplate && (
                   <div className="mt-6 p-4 border rounded-lg bg-muted/50">
                     <div className="flex justify-between items-center mb-4">
@@ -633,7 +633,7 @@ export default function QuestDashboard() {
                                 }
                               })
                             });
-                            
+
                             const data = await response.json();
                             if (data.success) {
                               setFormData({
@@ -988,127 +988,315 @@ export default function QuestDashboard() {
               </div>
 
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">2. Import and Use the Component</h3>
+                <h3 className="text-lg font-semibold">2. React Integration</h3>
                 <pre className="bg-slate-900 text-slate-50 p-4 rounded-lg overflow-x-auto max-w-3xl whitespace-pre-wrap">
-                  {`// React Example
-import { QuestTracker } from '@boredgamer/quest-react';
+{`import { QuestTracker, BoredGamerSDK } from '@boredgamer/quest-react';
 
 function GameUI() {
-  // Callback function for handling rewards
-  const handleQuestReward = async (questId, reward) => {
-    // Game-specific reward distribution logic
-    await gameSystem.awardCurrency(reward.amount);
-    // Or trigger achievement
-    await gameSystem.unlockAchievement(reward.achievementId);
-    // Or grant items
-    await gameSystem.grantItems(reward.items);
-  };
+  const sdk = new BoredGamerSDK({
+    apiKey: 'your-api-key',
+    gameId: 'your-game-id',
+    userId: 'player-123'
+  });
 
-  // Track game events for quest progress
-  const trackGameEvent = async (event) => {
-    // Events are automatically tracked and matched to quest conditions
-    await questTracker.trackEvent({
-      type: event.type,           // e.g., 'kill_monster', 'complete_level'
-      data: {
-        score: event.score,
-        playerName: event.playerName,
-        metadata: {
-          level: event.level,
-          difficulty: event.difficulty,
-          // Any other event-specific data
-        }
-      }
+  // Track quest-relevant events
+  const handleEnemyKill = (enemyType, score) => {
+    sdk.track('ENEMY_KILL', {
+      enemyType,
+      score,
+      timestamp: Date.now()
     });
   };
 
-  // Example: Track event when player defeats a boss
-  const onBossDefeated = async (bossData) => {
-    await trackGameEvent({
-      type: 'boss_defeated',
-      score: bossData.score,
-      playerName: currentPlayer.name,
-      metadata: {
-        bossId: bossData.id,
-        timeToDefeat: bossData.time
-      }
+  const handleLevelComplete = (level, time) => {
+    sdk.track('LEVEL_COMPLETE', {
+      level,
+      completionTime: time,
+      score: calculateScore(level, time)
     });
   };
 
   return (
-    <QuestTracker
-      apiKey="your-api-key"
-      gameId="your-game-id"
-      options={{
-        theme: 'dark',           // 'dark' or 'light'
-        layout: 'sidebar',       // 'sidebar', 'overlay', or 'minimal'
-        showProgress: true,      // Show progress bars
-        showRewards: true,       // Show quest rewards
-        showTimer: true,         // Show countdown for timed quests
-        autoTrack: true,         // Automatically track quest progress
-      }}
-      onQuestComplete={handleQuestReward}  // Reward callback
-      onEventTracked={(event) => {
-        console.log('Event tracked:', event);
-        // Optional: Additional game-specific logic when events are tracked
-      }}
-    />
+    <div className="game-ui">
+      {/* Your game UI */}
+      <div className="hud">
+        <QuestTracker
+          apiKey="your-api-key"
+          gameId="your-game-id"
+          userId="player-123"
+          options={{
+            theme: 'dark',
+            position: 'top-right',
+            maxQuests: 5,
+            showProgress: true,
+            autoRefresh: true,
+            onQuestComplete: (quest) => {
+              showNotification(\`Quest Complete: \${quest.name}\`);
+              playSound('quest-complete.mp3');
+            },
+            onRewardClaim: (reward) => {
+              // Handle reward in your game
+              if (reward.type === 'in_game') {
+                grantItem(reward.itemId, reward.quantity);
+              }
+            }
+          }}
+        />
+      </div>
+    </div>
   );
 }`}
                 </pre>
               </div>
 
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">3. Configure Reward Types</h3>
-                <p className="text-sm text-muted-foreground">
-                  When creating quests, specify reward types that match your game's economy:
-                </p>
+                <h3 className="text-lg font-semibold">3. Unity Integration</h3>
                 <pre className="bg-slate-900 text-slate-50 p-4 rounded-lg overflow-x-auto max-w-3xl whitespace-pre-wrap">
-                  {`// Example reward configurations
+{`// QuestManager.cs
+using UnityEngine;
+using BoredGamer.Quests;
+
+public class QuestManager : MonoBehaviour
 {
-  "rewards": {
-    "currency": {
-      "amount": 1000,
-      "type": "gold"  // Your game's currency type
-    },
-    "items": [
-      {
-        "id": "rare_sword",
-        "quantity": 1
-      }
-    ],
-    "achievements": [
-      "master_explorer"
-    ]
-  }
+    [SerializeField] private string apiKey = "your-api-key";
+    [SerializeField] private string gameId = "your-game-id";
+    [SerializeField] private GameObject questUIPrefab;
+
+    private BoredGamerQuests questSystem;
+    private GameObject questUI;
+
+    void Start()
+    {
+        // Initialize quest system
+        questSystem = new BoredGamerQuests(apiKey, gameId);
+        questSystem.SetUserId(GetPlayerId());
+
+        // Create quest UI
+        questUI = Instantiate(questUIPrefab);
+        var questTracker = questUI.GetComponent<QuestTracker>();
+        questTracker.Initialize(questSystem);
+
+        // Register event handlers
+        questSystem.OnQuestComplete += HandleQuestComplete;
+        questSystem.OnRewardAvailable += HandleRewardAvailable;
+    }
+
+    // Call this when player kills an enemy
+    public void OnEnemyKilled(string enemyType, int score)
+    {
+        questSystem.TrackEvent("ENEMY_KILL", new {
+            enemyType = enemyType,
+            score = score,
+            position = transform.position,
+            timestamp = System.DateTime.UtcNow
+        });
+    }
+
+    // Call this when player completes a level
+    public void OnLevelComplete(int level, float time)
+    {
+        questSystem.TrackEvent("LEVEL_COMPLETE", new {
+            level = level,
+            completionTime = time,
+            score = CalculateScore(level, time)
+        });
+    }
+
+    private void HandleQuestComplete(Quest quest)
+    {
+        // Show completion animation
+        ShowQuestCompleteAnimation(quest.name);
+
+        // Play sound
+        AudioSource.PlayClipAtPoint(questCompleteSound, Camera.main.transform.position);
+
+        // Update UI
+        UpdateQuestUI();
+    }
+
+    private void HandleRewardAvailable(QuestReward reward)
+    {
+        // Grant in-game rewards
+        switch (reward.type)
+        {
+            case "coins":
+                PlayerInventory.AddCoins(reward.amount);
+                break;
+            case "item":
+                PlayerInventory.AddItem(reward.itemId, reward.quantity);
+                break;
+            case "xp":
+                PlayerStats.AddExperience(reward.amount);
+                break;
+        }
+    }
 }`}
                 </pre>
               </div>
 
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">4. Cross-Game Progress Tracking</h3>
-                <p className="text-sm text-muted-foreground">
-                  For quests that span multiple games, our SDK tracks progress across all integrated games:
-                </p>
+                <h3 className="text-lg font-semibold">4. Unreal Engine Integration</h3>
                 <pre className="bg-slate-900 text-slate-50 p-4 rounded-lg overflow-x-auto max-w-3xl whitespace-pre-wrap">
-                  {`// Progress is automatically synced
-const questProgress = {
-  "questId": "cross_game_quest",
-  "progress": {
-    "game1": { /* progress in game 1 */ },
-    "game2": { /* progress in game 2 */ },
-    "totalProgress": 75  // Combined progress
-  }
-}`}
+{`// BoredGamerQuestSystem.h
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/GameInstanceSubsystem.h"
+#include "Http.h"
+#include "Json.h"
+#include "BoredGamerQuestSystem.generated.h"
+
+USTRUCT(BlueprintType)
+struct FQuestData
+{
+    GENERATED_BODY()
+
+    UPROPERTY(BlueprintReadOnly)
+    FString QuestId;
+
+    UPROPERTY(BlueprintReadOnly)
+    FString Name;
+
+    UPROPERTY(BlueprintReadOnly)
+    FString Description;
+
+    UPROPERTY(BlueprintReadOnly)
+    float Progress;
+
+    UPROPERTY(BlueprintReadOnly)
+    bool bCompleted;
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnQuestComplete, const FQuestData&, Quest);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnRewardGranted, const FString&, RewardType, int32, Amount);
+
+UCLASS()
+class YOURGAME_API UBoredGamerQuestSystem : public UGameInstanceSubsystem
+{
+    GENERATED_BODY()
+
+public:
+    virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+
+    UFUNCTION(BlueprintCallable, Category = "BoredGamer")
+    void InitializeQuests(const FString& ApiKey, const FString& GameId, const FString& UserId);
+
+    UFUNCTION(BlueprintCallable, Category = "BoredGamer")
+    void TrackEvent(const FString& EventType, const TSharedPtr<FJsonObject>& EventData);
+
+    UFUNCTION(BlueprintCallable, Category = "BoredGamer")
+    void RefreshQuests();
+
+    UPROPERTY(BlueprintAssignable)
+    FOnQuestComplete OnQuestComplete;
+
+    UPROPERTY(BlueprintAssignable)
+    FOnRewardGranted OnRewardGranted;
+
+private:
+    FString ApiKey;
+    FString GameId;
+    FString UserId;
+
+    TArray<FQuestData> ActiveQuests;
+
+    void SendEventToAPI(const FString& EventType, const TSharedPtr<FJsonObject>& EventData);
+    void HandleQuestResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess);
+    void ProcessQuestUpdate(const TSharedPtr<FJsonObject>& QuestJson);
+};
+
+// Usage in Blueprint:
+// 1. Get subsystem: Get Game Instance Subsystem (BoredGamer Quest System)
+// 2. Initialize: Initialize Quests (API Key, Game ID, User ID)
+// 3. Track events: Track Event ("ENEMY_KILL", Event Data)
+// 4. Bind to delegates for quest completion notifications`}
                 </pre>
-                <p className="text-sm text-muted-foreground mt-2">
-                  When a cross-game quest is completed, the reward callback is triggered in the game where the final progress was made.
-                  Each game handles its own reward distribution while our system tracks the overall completion.
-                </p>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">5. Web/JavaScript Integration</h3>
+                <pre className="bg-slate-900 text-slate-50 p-4 rounded-lg overflow-x-auto max-w-3xl whitespace-pre-wrap">
+{`<!-- Include the SDK -->
+<script src="https://cdn.boredgamer.com/sdk/boredgamer-sdk.js"></script>
+
+<script>
+// Initialize SDK
+const sdk = new BoredGamerSDK({
+  apiKey: 'your-api-key',
+  gameId: 'your-game-id',
+  userId: 'player-123'
+});
+
+// Load quest tracker widget
+sdk.loadQuestTracker('quest-container', {
+  theme: 'dark',
+  position: 'sidebar',
+  showProgress: true,
+  onQuestComplete: (quest) => {
+    // Show notification
+    showToast(\`Quest Complete: \${quest.name}\`);
+
+    // Play sound
+    playSound('quest-complete.mp3');
+
+    // Update game state
+    if (quest.reward.type === 'coins') {
+      addCoins(quest.reward.amount);
+    }
+  }
+});
+
+// Track game events
+function onEnemyKilled(enemy) {
+  sdk.track('ENEMY_KILL', {
+    enemyType: enemy.type,
+    level: enemy.level,
+    score: enemy.points,
+    weapon: player.currentWeapon
+  });
+}
+
+function onLevelComplete(level, stats) {
+  sdk.track('LEVEL_COMPLETE', {
+    level: level,
+    score: stats.score,
+    time: stats.completionTime,
+    deaths: stats.deaths,
+    accuracy: stats.accuracy
+  });
+}
+
+// Example game loop integration
+gameLoop.on('enemy-killed', onEnemyKilled);
+gameLoop.on('level-complete', onLevelComplete);
+gameLoop.on('item-collected', (item) => {
+  sdk.track('ITEM_COLLECT', {
+    itemType: item.type,
+    value: item.value,
+    location: item.position
+  });
+});
+</script>
+
+<!-- Quest UI Container -->
+<div id="quest-container"></div>`}
+                </pre>
+              </div>
+
+              <div className="mt-6 p-4 bg-blue-500/10 rounded-lg">
+                <h4 className="text-blue-400 font-medium mb-2">Integration Tips</h4>
+                <ul className="text-sm text-slate-300 space-y-2">
+                  <li>• Call track() immediately when events happen in your game</li>
+                  <li>• Quest progress updates automatically based on tracked events</li>
+                  <li>• Use meaningful event names that match your quest conditions</li>
+                  <li>• Include relevant metadata (location, difficulty, etc.) in events</li>
+                  <li>• Handle quest completion and rewards in your game's reward system</li>
+                  <li>• Test with debug mode enabled to see event flow</li>
+                </ul>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
-      </Tabs>
 
       {/* Modals */}
       <Dialog open={isEditingDates} onOpenChange={setIsEditingDates}>
