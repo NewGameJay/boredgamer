@@ -1,0 +1,47 @@
+ownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+index.js:590 Uncaught ModuleBuildError: Module build failed (from ./node_modules/next/dist/build/webpack/loaders/next-swc-loader.js):
+Error: 
+  × the name `db` is defined multiple times
+   ╭─[/home/runner/workspace/src/app/api/battlepass/route.ts:1:1]
+ 1 │ import { NextRequest, NextResponse } from 'next/server';
+ 2 │ import { headers } from 'next/headers';
+ 3 │ import { firestore as db } from '@/lib/firebase-admin';
+   ·                       ─┬
+   ·                        ╰── previous definition of `db` here
+ 4 │ 
+ 5 │ const db = admin.firestore();
+   ·       ─┬
+   ·        ╰── `db` redefined here
+ 6 │ 
+ 7 │ interface BattlePassTier {
+ 8 │   tier: number;
+   ╰────
+
+    at processResult (/home/runner/workspace/node_modules/next/dist/compiled/webpack/bundle5.js:28:398653)
+    at <unknown> (/home/runner/workspace/node_modules/next/dist/compiled/webpack/bundle5.js:28:400370)
+    at <unknown> (/home/runner/workspace/node_modules/next/dist/compiled/loader-runner/LoaderRunner.js:1:8645)
+    at <unknown> (/home/runner/workspace/node_modules/next/dist/compiled/loader-runner/LoaderRunner.js:1:5019)
+    at r.callback (/home/runner/workspace/node_modules/next/dist/compiled/loader-runner/LoaderRunner.js:1:4039)Understand this error
+/favicon.ico:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+websocket.js:46 [HMR] connected
+client.js:2 ./src/app/api/battlepass/route.ts
+Error: 
+  × the name `db` is defined multiple times
+   ╭─[/home/runner/workspace/src/app/api/battlepass/route.ts:1:1]
+ 1 │ import { NextRequest, NextResponse } from 'next/server';
+ 2 │ import { headers } from 'next/headers';
+ 3 │ import { firestore as db } from '@/lib/firebase-admin';
+   ·                       ─┬
+   ·                        ╰── previous definition of `db` here
+ 4 │ 
+ 5 │ const db = admin.firestore();
+   ·       ─┬
+   ·        ╰── `db` redefined here
+ 6 │ 
+ 7 │ interface BattlePassTier {
+ 8 │   tier: number;
+   ╰────
+console.error @ client.js:2Understand this error
