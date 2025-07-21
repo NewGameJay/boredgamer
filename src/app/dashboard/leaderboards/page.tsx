@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { useRouter } from 'next/navigation';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
+import RealTimeLeaderboard from '@/components/leaderboards/RealTimeLeaderboard';
 
 interface MetadataField {
   name: string;
@@ -55,6 +56,17 @@ interface Event {
   data: EventData;
 }
 
+interface LeaderboardEntry {
+  id: string;
+  playerName: string;
+  score: number;
+  rank: number;
+  category: string;
+  timestamp: string;
+  metadata?: Record<string, any>;
+  deltaChange?: number;
+}
+
 export default function LeaderboardDashboard() {
   const { user } = useAuth();
   const router = useRouter();
@@ -69,6 +81,9 @@ export default function LeaderboardDashboard() {
     todaySubmissions: 0,
     avgScore: 0
   });
+  const [realTimeData, setRealTimeData] = useState<LeaderboardEntry[]>([]);
+  const [timeFilter, setTimeFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [formData, setFormData] = useState<FormData>({
     name: '',
     startDate: '',
@@ -95,11 +110,11 @@ export default function LeaderboardDashboard() {
     return null;
   }
 
-  // Fetch leaderboards
+  // Fetch leaderboards with real-time updates
   useEffect(() => {
+    if (!user) return;
+
     const fetchLeaderboards = async () => {
-      if (!user) return;
-      
       try {
         const leaderboardsRef = collection(db, 'Leaderboards');
         const snapshot = await getDocs(leaderboardsRef);
@@ -113,6 +128,50 @@ export default function LeaderboardDashboard() {
     };
 
     fetchLeaderboards();
+
+    // Set up real-time listener for leaderboard entries
+    const scoresRef = collection(db, 'leaderboard_entries');
+    const scoresQuery = query(
+      scoresRef,
+      where('studioId', '==', user.id),
+      orderBy('score', 'desc'),
+      limit(100)
+    );
+
+    const unsubscribeScores = onSnapshot(scoresQuery, (snapshot) => {
+      const entries = snapshot.docs.map((doc, index) => ({
+        id: doc.id,
+        rank: index + 1,
+        ...doc.data(),
+        deltaChange: Math.floor(Math.random() * 5) - 2 // Simulate rank changes
+      })) as LeaderboardEntry[];
+      
+      setRealTimeData(entries);
+      
+      // Calculate real-time stats
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const todayEntries = entries.filter(entry => 
+        new Date(entry.timestamp) >= today
+      );
+      
+      const uniquePlayerIds = new Set(entries.map(entry => entry.playerName));
+      const avgScore = entries.length > 0 
+        ? entries.reduce((sum, entry) => sum + entry.score, 0) / entries.length 
+        : 0;
+
+      setStats({
+        totalEntries: entries.length,
+        uniquePlayers: uniquePlayerIds.size,
+        todaySubmissions: todayEntries.length,
+        avgScore: Math.round(avgScore)
+      });
+    });
+
+    return () => {
+      unsubscribeScores();
+    };
   }, [user]);
 
   useEffect(() => {
@@ -690,40 +749,57 @@ Leaderboard->SubmitScore(1000.0f, "PlayerName");`}
 
                     <div className="space-y-4">
                       <div className="flex gap-4">
-                        <select className="select flex-1" style={{ marginBottom: '1rem' }}>
+                        <select 
+                          className="select flex-1" 
+                          value={timeFilter}
+                          onChange={(e) => setTimeFilter(e.target.value)}
+                          style={{ marginBottom: '1rem' }}
+                        >
                           <option value="all">All Time</option>
                           <option value="today">Today</option>
                           <option value="week">This Week</option>
                           <option value="month">This Month</option>
                           <option value="custom">Custom Range</option>
                         </select>
+                        <select 
+                          className="select flex-1" 
+                          value={categoryFilter}
+                          onChange={(e) => setCategoryFilter(e.target.value)}
+                          style={{ marginBottom: '1rem' }}
+                        >
+                          <option value="all">All Categories</option>
+                          <option value="high-score">High Score</option>
+                          <option value="speed-run">Speed Run</option>
+                          <option value="survival">Survival</option>
+                          <option value="pvp">PvP</option>
+                        </select>
                         <Button variant="outline">
-                          Filter Metadata
-                        </Button>
-                        <Button variant="outline">
-                          Export
+                          Export CSV
                         </Button>
                       </div>
 
 
 
-                      {/* Stats */}
+                      {/* Real-time Stats */}
                       <div className="grid grid-cols-4 gap-4">
                         <div className="bg-slate-100 p-4 rounded-lg">
-                          <div className="text-sm text-slate-500">Total Entries</div>
-                          <div className="text-2xl font-semibold">1,234</div>
+                          <div className="text-sm text-slate-500 flex items-center gap-2">
+                            Total Entries
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                          </div>
+                          <div className="text-2xl font-semibold">{stats.totalEntries.toLocaleString()}</div>
                         </div>
                         <div className="bg-slate-100 p-4 rounded-lg">
                           <div className="text-sm text-slate-500">Unique Players</div>
-                          <div className="text-2xl font-semibold">567</div>
+                          <div className="text-2xl font-semibold">{stats.uniquePlayers.toLocaleString()}</div>
                         </div>
                         <div className="bg-slate-100 p-4 rounded-lg">
                           <div className="text-sm text-slate-500">Today's Submissions</div>
-                          <div className="text-2xl font-semibold">89</div>
+                          <div className="text-2xl font-semibold text-blue-600">{stats.todaySubmissions}</div>
                         </div>
                         <div className="bg-slate-100 p-4 rounded-lg">
                           <div className="text-sm text-slate-500">Avg Score</div>
-                          <div className="text-2xl font-semibold">750,000</div>
+                          <div className="text-2xl font-semibold">{stats.avgScore.toLocaleString()}</div>
                         </div>
                       </div>
                     </div>
@@ -796,6 +872,15 @@ Leaderboard->SubmitScore(1000.0f, "PlayerName");`}
             </CardHeader>
             <CardContent>
               {!selectedLeaderboard ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <RealTimeLeaderboard 
+                    entries={realTimeData}
+                    timeFilter={timeFilter}
+                    categoryFilter={categoryFilter}
+                  />
+                  <div className="bg-slate-900 text-slate-50 p-4 rounded-lg h-[400px] overflow-y-auto font-mono text-sm"></div>
+                </div>
+              ) : (
                 <div className="bg-slate-900 text-slate-50 p-4 rounded-lg h-[400px] overflow-y-auto font-mono text-sm">
                   <table className="w-full border-collapse border border-slate-700 datatable">
                     <thead className="sticky top-0 bg-slate-900/95 backdrop-blur supports-[backdrop-filter]:bg-slate-900/75">
